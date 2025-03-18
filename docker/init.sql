@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS etl_data (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    value FLOAT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
