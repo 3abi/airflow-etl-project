@@ -1,9 +1,26 @@
+import sys
+import os
+
+sys.path.insert(0, "/opt/airflow/scripts")
+
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-import scripts.extract as extract
-import scripts.transform as transform
-import scripts.load as load
+import extract
+import transform
+import load
+
+from extract import extract_data
+from transform import transform_data
+from load import load_data
+
+# Ajoute /opt/airflow/scripts au path Python
+#sys.path.append('/opt/airflow/scripts')
+
+
+
+
 
 # Paramètres du DAG
 default_args = {
