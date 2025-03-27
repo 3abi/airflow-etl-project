@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Juste Valeur - Marketstack</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 2rem;
+      background-color: #eef2f7;
+      color: #333;
+    }
+
+    h2 {
+      color: #1a1a1a;
+    }
+
+    input, button {
+      padding: 10px;
+      font-size: 1rem;
+      margin-right: 0.5rem;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    input {
+      width: 280px;
+    }
+
+    button {
+      background-color: #007BFF;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #output {
+      margin-top: 2rem;
+      padding: 1rem;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    ul {
+      padding-left: 1.2rem;
+    }
+
+    li {
+      margin-bottom: 4px;
+    }
+
+    .error {
+      color: red;
+    }
+
+    .loading {
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h2>Rechercher une action (Marketstack)</h2>
+  <input type="text" id="searchInput" placeholder="Ex: AAPL, MSFT, AIR.PA">
+  <button id="searchBtn">Obtenir les données</button>
+
+  <div id="output"></div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const searchBtn = document.getElementById("searchBtn");
+      searchBtn.addEventListener("click", fetchStockData);
+    });
+
+    async function fetchStockData() {
+      const symbol = document.getElementById("searchInput").value.trim().toUpperCase();
+      const output = document.getElementById("output");
+      const apiKey = "TA_CLE_API"; // À remplacer par ta vraie clé
+
+      if (!symbol) {
+        output.innerHTML = '<p class="error">Veuillez entrer un symbole valide.</p>';
+        return;
+      }
+
+      output.innerHTML = '<p class="loading">Chargement des données...</p>';
+
+      const endpoints = {
+        latest: "http://api.marketstack.com/v1/eod/latest",
+        profile: `http://api.marketstack.com/v1/tickers/${symbol}`,
+        history: "http://api.marketstack.com/v1/eod"
+      };
+
+      try {
+        const params = new URLSearchParams({ access_key: apiKey, symbols: symbol });
+        const [latestRes, profileRes, historyRes] = await Promise.all([
+          fetch(`${endpoints.latest}?${params}`),
+          fetch(endpoints.profile + `?access_key=${apiKey}`),
+          fetch(`${endpoints.history}?${params}&limit=30`)
+        ]);
+
+        const [latestData, profileData, historyData] = await Promise.all([
+          latestRes.json(),
+          profileRes.json(),
+          historyRes.json()
+        ]);
+
+        const latest = latestData?.data?.[0];
+        const profile = profileData?.data;
+        const history = historyData?.data;
+
+        if (!latest || !profile || !history?.length) {
+          output.innerHTML = '<p class="error">Données incomplètes ou symbole introuvable.</p>';
+          return;
+        }
+
+        output.innerHTML = `
+          <h3>${profile.name} (${symbol})</h3>
+          <p><strong>Bourse :</strong> ${profile.stock_exchange.name} (${profile.stock_exchange.acronym})</p>
+          <p><strong>Pays :</strong> ${profile.stock_exchange.country}</p>
+          <p><strong>Date :</strong> ${new Date(latest.date).toLocaleDateString()}</p>
+          <p><strong>Clôture :</strong> ${latest.close} USD</p>
+          <p><strong>Ouverture :</strong> ${latest.open} USD</p>
+          <p><strong>Haut :</strong> ${latest.high} USD</p>
+          <p><strong>Bas :</strong> ${latest.low} USD</p>
+          <hr/>
+          <h4>Historique des 30 derniers jours :</h4>
+          <ul>
+            ${history.map(day => `
+              <li>${new Date(day.date).toLocaleDateString()} : ${day.close} USD</li>
+            `).join('')}
+          </ul>
+        `;
+      } catch (err) {
+        console.error(err);
+        output.innerHTML = '<p class="error">Erreur lors de la récupération des données.</p>';
+      }
+    }
+  </script>
+</body>
+</html>
