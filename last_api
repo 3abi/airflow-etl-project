@@ -2,17 +2,17 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Historique Boursier avec Graphique</title>
+  <title>Données boursières complètes</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background-color: #f9f9f9;
+      background-color: #f4f6f8;
       padding: 2rem;
       color: #333;
     }
 
-    h2 {
+    h2, h3 {
       margin-bottom: 1rem;
     }
 
@@ -38,122 +38,205 @@
     #output {
       margin-top: 2rem;
       background: #fff;
-      padding: 1rem;
+      padding: 1.5rem;
       border-radius: 8px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
     canvas {
       display: none;
-      margin-top: 1rem;
+      margin-top: 2rem;
     }
 
     .error {
       color: red;
+      font-weight: bold;
     }
 
     ul {
-      padding-left: 0;
       list-style: none;
+      padding-left: 0;
+      margin-top: 1rem;
     }
 
     li {
       padding: 5px 0;
       border-bottom: 1px solid #eee;
     }
+
+    .profile-block {
+      margin-bottom: 1.5rem;
+      overflow-wrap: break-word;
+    }
+
+    .loading {
+      color: #777;
+      font-style: italic;
+    }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <h2>Historique boursier (avec graphique)</h2>
+  <h2>Données boursières complètes</h2>
   <input type="text" id="symbolInput" placeholder="Ex: AAPL, MSFT, AIR.PA">
   <input type="date" id="startDate">
   <input type="date" id="endDate">
-  <button id="getHistoryBtn">Afficher</button>
-  <button id="downloadBtn" style="display:none;">📁 Export CSV</button>
+  <button id="getDataBtn">Afficher</button>
+  <button id="downloadBtn" class="hidden">📁 Export CSV</button>
 
   <div id="output">
+    <p id="status" class="loading hidden">Chargement en cours...</p>
+    <section id="profile"></section>
     <canvas id="chart" width="600" height="300"></canvas>
     <ul id="historyList"></ul>
   </div>
 
   <script>
-    const apiKey = "TA_CLE_API"; // 👉 Remplace avec ta vraie clé Marketstack
-
-    document.getElementById("getHistoryBtn").addEventListener("click", getStockHistory);
-    document.getElementById("downloadBtn").addEventListener("click", exportCSV);
+    const apiKey = "TA_CLE_API"; // Remplacer par ta clé API Marketstack
 
     let chartInstance;
     let historyData = [];
 
-    async function getStockHistory() {
-      const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
-      const start = document.getElementById("startDate").value;
-      const end = document.getElementById("endDate").value;
-      const historyList = document.getElementById("historyList");
-      const downloadBtn = document.getElementById("downloadBtn");
-      const chartCanvas = document.getElementById("chart");
+    const symbolInput = document.getElementById("symbolInput");
+    const startDateInput = document.getElementById("startDate");
+    const endDateInput = document.getElementById("endDate");
+    const status = document.getElementById("status");
+    const profileBlock = document.getElementById("profile");
+    const chartCanvas = document.getElementById("chart");
+    const historyList = document.getElementById("historyList");
+    const downloadBtn = document.getElementById("downloadBtn");
 
-      historyList.innerHTML = "";
-      chartCanvas.style.display = "none";
-      downloadBtn.style.display = "none";
+    document.getElementById("getDataBtn").addEventListener("click", getAllStockData);
+    downloadBtn.addEventListener("click", exportCSV);
+    symbolInput.focus();
+
+    async function getAllStockData() {
+      const symbol = symbolInput.value.trim().toUpperCase();
+      const start = startDateInput.value;
+      const end = endDateInput.value;
+
+      resetDisplay();
 
       if (!symbol) {
-        historyList.innerHTML = "<p class='error'>Veuillez saisir un symbole.</p>";
+        showError("Veuillez entrer un symbole valide.");
         return;
       }
 
-      const url = new URL("http://api.marketstack.com/v1/eod");
-      url.searchParams.set("access_key", apiKey);
-      url.searchParams.set("symbols", symbol);
-      if (start) url.searchParams.set("date_from", start);
-      if (end) url.searchParams.set("date_to", end);
-      url.searchParams.set("limit", 100);
+      showLoading();
 
       try {
-        const res = await fetch(url);
-        const json = await res.json();
+        const latestUrl = `https://api.marketstack.com/v1/eod/latest?access_key=${apiKey}&symbols=${symbol}`;
+        const profileUrl = `https://api.marketstack.com/v1/tickers/${symbol}?access_key=${apiKey}`;
+        const historyUrl = new URL("https://api.marketstack.com/v1/eod");
+        historyUrl.searchParams.set("access_key", apiKey);
+        historyUrl.searchParams.set("symbols", symbol);
+        if (start) historyUrl.searchParams.set("date_from", start);
+        if (end) historyUrl.searchParams.set("date_to", end);
+        historyUrl.searchParams.set("limit", 100);
 
-        if (!json.data || json.data.length === 0) {
-          historyList.innerHTML = "<p class='error'>Aucune donnée trouvée.</p>";
+        const [latestRes, profileRes, historyRes] = await Promise.all([
+          fetch(latestUrl),
+          fetch(profileUrl),
+          fetch(historyUrl.toString())
+        ]);
+
+        if (!latestRes.ok || !profileRes.ok || !historyRes.ok) {
+          throw new Error("Une des requêtes a échoué.");
+        }
+
+        const [latestData, profileData, historyRaw] = await Promise.all([
+          latestRes.json(),
+          profileRes.json(),
+          historyRes.json()
+        ]);
+
+        const latest = latestData?.data?.[0];
+        const profile = profileData?.data;
+        historyData = historyRaw?.data?.reverse() || [];
+
+        if (!latest || !profile || historyData.length === 0) {
+          showError("Données incomplètes ou symbole introuvable.");
           return;
         }
 
-        historyData = json.data.reverse(); // ordre chronologique
-        downloadBtn.style.display = "inline-block";
+        renderProfile(profile, latest);
+        renderHistoryList(historyData);
+        renderChart(
+          historyData.map(d => new Date(d.date).toLocaleDateString()),
+          historyData.map(d => d.close),
+          symbol
+        );
 
-        const labels = historyData.map(item => new Date(item.date).toLocaleDateString());
-        const prices = historyData.map(item => item.close);
-
-        historyList.innerHTML = historyData.map(d =>
-          `<li><strong>${new Date(d.date).toLocaleDateString()}</strong> : ${d.close} USD</li>`
-        ).join('');
-
-        renderChart(labels, prices, symbol);
-        chartCanvas.style.display = "block";
+        chartCanvas.style.display = 'block';
+        downloadBtn.classList.remove("hidden");
+        status.classList.add("hidden");
 
       } catch (err) {
         console.error(err);
-        historyList.innerHTML = "<p class='error'>Erreur lors du chargement.</p>";
+        showError("Erreur lors de la récupération des données.");
       }
     }
 
-    function renderChart(labels, data, symbol) {
-      const ctx = document.getElementById("chart").getContext("2d");
+    function resetDisplay() {
+      profileBlock.innerHTML = '';
+      historyList.innerHTML = '';
+      chartCanvas.style.display = 'none';
+      downloadBtn.classList.add("hidden");
+      status.classList.add("hidden");
+    }
 
-      if (chartInstance) {
-        chartInstance.destroy();
-      }
+    function showError(message) {
+      status.classList.remove("hidden");
+      status.classList.remove("loading");
+      status.classList.add("error");
+      status.textContent = message;
+    }
+
+    function showLoading() {
+      status.classList.remove("hidden");
+      status.classList.remove("error");
+      status.classList.add("loading");
+      status.textContent = "Chargement en cours...";
+    }
+
+    function renderProfile(profile, latest) {
+      profileBlock.innerHTML = `
+        <article class="profile-block">
+          <h3>${profile.name} (${profile.symbol})</h3>
+          <p><strong>Bourse :</strong> ${profile.stock_exchange.name} (${profile.stock_exchange.acronym})</p>
+          <p><strong>Pays :</strong> ${profile.stock_exchange.country}</p>
+          <p><strong>Date récente :</strong> ${new Date(latest.date).toLocaleDateString()}</p>
+          <p><strong>Clôture :</strong> ${latest.close} USD</p>
+          <p><strong>Ouverture :</strong> ${latest.open} USD</p>
+          <p><strong>+ Haut :</strong> ${latest.high} USD | <strong>+ Bas :</strong> ${latest.low} USD</p>
+          ${latest.volume ? `<p><strong>Volume :</strong> ${latest.volume.toLocaleString()} actions</p>` : ""}
+        </article>
+      `;
+    }
+
+    function renderHistoryList(data) {
+      historyList.innerHTML = data.map(d => `
+        <li><strong>${new Date(d.date).toLocaleDateString()}</strong> : ${d.close} USD</li>
+      `).join('');
+    }
+
+    function renderChart(labels, data, symbol) {
+      const ctx = chartCanvas.getContext("2d");
+      if (chartInstance) chartInstance.destroy();
 
       chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: labels,
+          labels,
           datasets: [{
-            label: `Clôture (${symbol})`,
-            data: data,
-            fill: false,
+            label: `Cours de clôture - ${symbol}`,
+            data,
             borderColor: '#007BFF',
-            tension: 0.3
+            fill: false,
+            tension: 0.25
           }]
         },
         options: {
@@ -162,14 +245,8 @@
             legend: { position: 'top' }
           },
           scales: {
-            x: {
-              display: true,
-              title: { display: true, text: "Date" }
-            },
-            y: {
-              display: true,
-              title: { display: true, text: "Prix (USD)" }
-            }
+            x: { title: { display: true, text: "Date" }},
+            y: { title: { display: true, text: "Prix (USD)" }}
           }
         }
       });
@@ -177,17 +254,14 @@
 
     function exportCSV() {
       if (historyData.length === 0) return;
+      const csv = "Date,Clôture (USD)\n" + historyData.map(d =>
+        `${new Date(d.date).toLocaleDateString()},${d.close}`
+      ).join("\n");
 
-      const csvContent = "data:text/csv;charset=utf-8,"
-        + "Date,Clôture (USD)\n"
-        + historyData.map(row =>
-            `${new Date(row.date).toLocaleDateString()},${row.close}`
-          ).join("\n");
-
-      const encodedUri = encodeURI(csvContent);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "historique_boursier.csv");
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", "donnees_boursieres.csv");
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
