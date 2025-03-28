@@ -1,2 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Yahoo Finance TimeSeries</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2>📊 Évolution des ratios financiers pour IBM (5 dernières années)</h2>
+  <canvas id="chart" width="800" height="400"></canvas>
 
-https://apidojo-yahoo-finance-v1.p.rapidapi.com/stock/v2/get-timeseries?symbol=IBM&period2=1571590800&period1=493578000&region=US
+  <script>
+    const headers = {
+      'X-RapidAPI-Key': 'TA_VRAIE_CLÉ_ICI',
+      'X-RapidAPI-Host': 'apidojo-yahoo-finance-v1.p.rapidapi.com'
+    };
+
+    async function fetchRatiosData() {
+      try {
+        const response = await axios.get(
+          'https://apidojo-yahoo-finance-v1.p.rapidapi.com/stock/v2/get-timeseries',
+          {
+            params: {
+              symbol: 'IBM',
+              region: 'US',
+              period1: '1571590800',
+              period2: '1711344000'
+            },
+            headers: headers
+          }
+        );
+
+        const timeseries = response.data?.timeseries;
+        if (!timeseries || !Array.isArray(timeseries)) {
+          throw new Error('Pas de données disponibles.');
+        }
+
+        const data = timeseries.find(series => series.meta.symbol === 'IBM');
+
+        const dates = data.timestamp.map(ts => new Date(ts * 1000).toLocaleDateString());
+
+        const extractSeries = (seriesKey) => {
+          return data.series?.[seriesKey]?.map(val => val.raw) || new Array(dates.length).fill(null);
+        };
+
+        const datasets = [
+          {
+            label: 'PER',
+            data: extractSeries('trailingPe'),
+            borderColor: '#007BFF',
+            fill: false,
+            tension: 0.3
+          },
+          {
+            label: 'PBR (Price to Book)',
+            data: extractSeries('priceToBook'),
+            borderColor: '#28a745',
+            fill: false,
+            tension: 0.3
+          },
+          {
+            label: 'PSR (Price to Sales)',
+            data: extractSeries('priceToSalesTrailing12Months'),
+            borderColor: '#ffc107',
+            fill: false,
+            tension: 0.3
+          },
+          {
+            label: 'PCF (Price to Cash Flow)',
+            data: extractSeries('priceToCashflow'),
+            borderColor: '#dc3545',
+            fill: false,
+            tension: 0.3
+          }
+        ];
+
+        const ctx = document.getElementById('chart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: dates,
+            datasets: datasets
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: 'top' }
+            },
+            scales: {
+              x: { title: { display: true, text: "Date" } },
+              y: { title: { display: true, text: "Valeur du ratio" } }
+            }
+          }
+        });
+
+      } catch (err) {
+        console.error('Erreur Yahoo:', err);
+        document.body.innerHTML += `<p style='color:red;'>${err.message}</p>`;
+      }
+    }
+
+    fetchRatiosData();
+  </script>
+</body>
+</html>
