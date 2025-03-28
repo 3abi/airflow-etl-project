@@ -1,57 +1,116 @@
-<!-- profil.html -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Profil d'une action</title>
+  <title>Données financières complètes</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; padding: 2rem; background-color: #f9f9f9; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f4f6f8; padding: 2rem; color: #333; }
     input, button { padding: 10px; margin: 0.5rem 0.5rem 1rem 0; font-size: 1rem; border-radius: 5px; border: 1px solid #ccc; }
-    button { background: #007BFF; color: white; cursor: pointer; }
+    button { background: #007BFF; color: #fff; cursor: pointer; }
     button:hover { background: #0056b3; }
-    #output { padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    .error { color: red; }
+    #output { padding: 1.5rem; background: #fff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .section { margin-bottom: 2rem; }
+    .error { color: red; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
   </style>
 </head>
 <body>
-  <h2>📘 Profil d'une action</h2>
-  <input type="text" id="symbolInput" placeholder="Ex: AAPL, MSFT, AIR.PA">
-  <button onclick="getProfile()">Afficher</button>
+  <h2>🔎 Données financières complètes (Marketstack + Yahoo Finance)</h2>
+  <input type="text" id="symbolInput" placeholder="Ex: MSFT, AAPL">
+  <button onclick="getFullData()">Afficher</button>
+
   <div id="output"></div>
 
   <script>
-    const apiKey = "TA_CLE_API"; // Remplace par ta clé API
+    const marketstackKey = "TA_CLE_API_MARKETSTACK";
+    const yahooHeaders = {
+      'X-RapidAPI-Key': 'TA_CLE_API_RAPIDAPI',
+      'X-RapidAPI-Host': 'apidojo-yahoo-finance-v1.p.rapidapi.com'
+    };
 
-    async function getProfile() {
+    async function getFullData() {
       const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
       const output = document.getElementById("output");
       output.innerHTML = "Chargement...";
 
-      if (!symbol) {
-        output.innerHTML = "<p class='error'>Veuillez entrer un symbole.</p>";
-        return;
-      }
-
       try {
-        const res = await fetch(`https://api.marketstack.com/v1/tickers/${symbol}?access_key=${apiKey}`);
-        const data = await res.json();
+        // Marketstack: Profil de l'action
+        const marketstackRes = await fetch(`https://api.marketstack.com/v1/tickers/${symbol}?access_key=${marketstackKey}`);
+        const marketstackData = await marketstackRes.json();
+        const profile = marketstackData?.data;
 
-        if (!data?.data) {
-          output.innerHTML = "<p class='error'>Symbole introuvable.</p>";
-          return;
-        }
+        // Yahoo Finance: Données actuelles + ratios
+        const yahooQuoteUrl = `https://apidojo-yahoo-finance-v1.p.rapidapi.com/stock/v2/get-summary?symbol=${symbol}&region=US`;
+        const yahooRatiosUrl = `https://apidojo-yahoo-finance-v1.p.rapidapi.com/stock/v2/get-statistics?symbol=${symbol}&region=US`;
 
-        const d = data.data;
+        const [quoteRes, ratioRes] = await Promise.all([
+          axios.get(yahooQuoteUrl, { headers: yahooHeaders }),
+          axios.get(yahooRatiosUrl, { headers: yahooHeaders })
+        ]);
+
+        const quote = quoteRes.data;
+        const stats = ratioRes.data;
+
+        const price = quote?.price?.regularMarketPrice?.raw ?? 'N/A';
+        const currency = quote?.price?.currency ?? 'USD';
+        const marketCap = quote?.price?.marketCap?.fmt ?? 'N/A';
+        const cashPerShare = stats?.defaultKeyStatistics?.totalCashPerShare?.fmt ?? 'N/A';
+        const revenue = stats?.financialData?.totalRevenue?.fmt ?? 'N/A';
+        const bookValue = stats?.defaultKeyStatistics?.bookValue?.fmt ?? 'N/A';
+
+        const ratios = {
+          PER: {
+            avg: stats?.summaryDetail?.trailingPE?.fmt ?? 'N/A',
+            current: quote?.summaryDetail?.trailingPE?.fmt ?? 'N/A'
+          },
+          PCF: {
+            avg: 'N/A',
+            current: stats?.defaultKeyStatistics?.priceToCashflow?.fmt ?? 'N/A'
+          },
+          PSR: {
+            avg: 'N/A',
+            current: stats?.summaryDetail?.priceToSalesTrailing12Months?.fmt ?? 'N/A'
+          },
+          PBR: {
+            avg: 'N/A',
+            current: stats?.defaultKeyStatistics?.priceToBook?.fmt ?? 'N/A'
+          }
+        };
+
         output.innerHTML = `
-          <h3>${d.name} (${d.symbol})</h3>
-          <p><strong>Bourse :</strong> ${d.stock_exchange.name} (${d.stock_exchange.acronym})</p>
-          <p><strong>Pays :</strong> ${d.stock_exchange.country}</p>
-          <p><strong>Devise :</strong> ${d.currency}</p>
-          <p><strong>Site :</strong> <a href="${d.website}" target="_blank">${d.website}</a></p>
+          <div class="section">
+            <h3>${profile.name} (${profile.symbol})</h3>
+            <p><strong>Bourse :</strong> ${profile.stock_exchange.name} (${profile.stock_exchange.acronym})</p>
+          </div>
+
+          <div class="section">
+            <h4>Données actuelles</h4>
+            <table>
+              <tr><th>Prix</th><td>${price} ${currency}</td></tr>
+              <tr><th>Market Cap</th><td>${marketCap}</td></tr>
+              <tr><th>Cash par action</th><td>${cashPerShare}</td></tr>
+              <tr><th>Chiffre d'affaires</th><td>${revenue}</td></tr>
+              <tr><th>Valeur comptable</th><td>${bookValue}</td></tr>
+            </table>
+          </div>
+
+          <div class="section">
+            <h4>Ratios financiers</h4>
+            <table>
+              <tr><th>Ratio</th><th>Moyenne 5 ans</th><th>Actuel</th></tr>
+              <tr><td>PER</td><td>${ratios.PER.avg}</td><td>${ratios.PER.current}</td></tr>
+              <tr><td>PCF</td><td>${ratios.PCF.avg}</td><td>${ratios.PCF.current}</td></tr>
+              <tr><td>PSR</td><td>${ratios.PSR.avg}</td><td>${ratios.PSR.current}</td></tr>
+              <tr><td>PBR</td><td>${ratios.PBR.avg}</td><td>${ratios.PBR.current}</td></tr>
+            </table>
+          </div>
         `;
-      } catch (e) {
-        console.error(e);
-        output.innerHTML = "<p class='error'>Erreur lors de la récupération.</p>";
+
+      } catch (err) {
+        console.error(err);
+        output.innerHTML = "<p class='error'>Erreur lors de la récupération des données.</p>";
       }
     }
   </script>
