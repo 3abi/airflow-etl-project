@@ -1,24 +1,39 @@
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script>
-  const headers = {
-    'X-RapidAPI-Key': 'TA_VRAIE_CLÉ_ICI',
-    'X-RapidAPI-Host': 'apidojo-yahoo-finance-v1.p.rapidapi.com'
-  };
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Yahoo Finance via RapidAPI</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <h2>Test API Yahoo Finance (symbol: MSFT)</h2>
+  <pre id="result">Chargement...</pre>
 
-  async function testYahoo() {
-    try {
-      const response = await axios.get(
-        'https://apidojo-yahoo-finance-v1.p.rapidapi.com/stock/v2/get-summary',
-        {
-          params: { symbol: 'MSFT', region: 'US' },
-          headers: headers
-        }
-      );
-      console.log('Réponse Yahoo:', response.data);
-    } catch (err) {
-      console.error('Erreur Yahoo:', err);
+  <script>
+    const headers = {
+      'X-RapidAPI-Key': 'TA_VRAIE_CLÉ_ICI', // Remplace ici
+      'X-RapidAPI-Host': 'apidojo-yahoo-finance-v1.p.rapidapi.com'
+    };
+
+    async function testYahoo() {
+      const result = document.getElementById('result');
+      try {
+        const response = await axios.get(
+          'https://apidojo-yahoo-finance-v1.p.rapidapi.com/stock/v2/get-summary',
+          {
+            params: { symbol: 'MSFT', region: 'US' },
+            headers: headers
+          }
+        );
+        console.log('Réponse Yahoo:', response.data);
+        result.textContent = JSON.stringify(response.data, null, 2);
+      } catch (err) {
+        console.error('Erreur Yahoo:', err);
+        result.textContent = 'Erreur : ' + (err.response?.data?.message || err.message);
+      }
     }
-  }
 
-  testYahoo();
-</script>
+    testYahoo();
+  </script>
+</body>
+</html>
