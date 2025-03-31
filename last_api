@@ -2,152 +2,131 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Données Boursières</title>
+    <title>Données Boursières - Fondamentaux</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
-            padding: 0;
-            background-color: #f5f5f5;
+            padding: 20px;
+            background-color: #f4f4f4;
         }
-        h1 {
-            text-align: center;
+        input, button {
+            padding: 8px;
+            margin-right: 10px;
         }
         #results {
             margin-top: 20px;
         }
         .section {
             margin-bottom: 20px;
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .section h3 {
+        .section h2 {
             margin-bottom: 10px;
         }
-        .section pre {
-            background-color: #fff;
+        pre {
+            background-color: #eee;
             padding: 10px;
             border-radius: 5px;
-            border: 1px solid #ddd;
             overflow-x: auto;
-        }
-        #loader {
-            text-align: center;
-            display: none;
         }
     </style>
 </head>
 <body>
-    <h1>Récupérer les données boursières d'une action</h1>
+
+    <h1>Analyse Fondamentale d'une Action</h1>
 
     <div>
-        <label for="symbol">Entrez le symbole de l'action (ex: AAPL, TSLA) :</label>
-        <input type="text" id="symbol" placeholder="Ex : AAPL">
-        <button onclick="fetchStockData()">Obtenir les données</button>
-    </div>
-
-    <div id="loader">
-        <p>Chargement des données...</p>
+        <label for="symbol">Symbole de l'action :</label>
+        <input type="text" id="symbol" placeholder="Ex : AAPL, MSFT">
+        <button onclick="getFundamentals()">Obtenir les données</button>
     </div>
 
     <div id="results"></div>
 
     <script>
-        // Remplacez ces valeurs par vos propres clés API
-        const marketstackApiKey = '';
-        const yahooFinanceApiKey = '';
+        const yahooFinanceApiKey = 'VOTRE_CLE_API_ICI';
 
-        async function fetchStockData() {
+        async function getFundamentals() {
             const symbol = document.getElementById('symbol').value.trim();
-
             if (!symbol) {
-                alert('Veuillez entrer un symbole d\'action.');
+                alert('Veuillez entrer un symbole boursier.');
                 return;
             }
 
-            // Afficher le loader
-            document.getElementById('loader').style.display = 'block';
-            document.getElementById('results').innerHTML = '';
+            const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=price,summaryDetail,defaultKeyStatistics,financialData`;
 
             try {
-                const stockData = await getStockData(symbol);
+                const response = await fetch(url, {
+                    headers: {
+                        'x-api-key': yahooFinanceApiKey
+                    }
+                });
 
-                // Masquer le loader
-                document.getElementById('loader').style.display = 'none';
-
-                // Afficher les résultats
-                displayResults(stockData);
-            } catch (error) {
-                // Masquer le loader en cas d'erreur
-                document.getElementById('loader').style.display = 'none';
-                alert('Une erreur est survenue lors de la récupération des données.');
-                console.error(error);
-            }
-        }
-
-        async function getStockData(symbol) {
-            try {
-                const marketstackCurrentData = await getMarketstackCurrentData(symbol);
-                const yahooFinanceCurrentData = await getYahooFinanceCurrentData(symbol);
-                const marketstackHistoricalData = await getMarketstackHistoricalData(symbol);
-
-                return {
-                    marketstackCurrentData,
-                    yahooFinanceCurrentData,
-                    marketstackHistoricalData
-                };
-            } catch (error) {
-                console.error("Erreur lors de la récupération des données boursières :", error);
-                throw error;
-            }
-        }
-
-        async function getMarketstackCurrentData(symbol) {
-            const url = `https://api.marketstack.com/v1/eod/latest?access_key=${marketstackApiKey}&symbols=${symbol}`;
-
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Erreur lors de la récupération des données actuelles depuis Marketstack pour ${symbol}`);
-            }
-
-            const data = await response.json();
-            return data.data[0];
-        }
-
-        async function getYahooFinanceCurrentData(symbol) {
-            const url = `https://yfapi.net/v6/finance/quote?symbols=${symbol}`;
-
-            const response = await fetch(url, {
-                headers: {
-                    'x-api-key': yahooFinanceApiKey
+                if (!response.ok) {
+                    throw new Error(`Erreur lors de la requête : ${response.statusText}`);
                 }
-            });
 
-            if (!response.ok) {
-                throw new Error(`Erreur lors de la récupération des données actuelles depuis Yahoo Finance pour ${symbol}`);
+                const data = await response.json();
+                const quote = data.quoteSummary.result[0];
+
+                const general = {
+                    symbole: symbol,
+                    nom: quote.price.longName,
+                    exchange: quote.price.exchangeName
+                };
+
+                const fondamentaux = {
+                    prixActuel: quote.price.regularMarketPrice?.raw,
+                    devise: quote.price.currency,
+                    capitalisation: quote.price.marketCap?.fmt,
+                    tresorerieParAction: quote.financialData.totalCashPerShare?.fmt,
+                    chiffreAffaires: quote.financialData.totalRevenue?.fmt,
+                    valeurComptable: quote.defaultKeyStatistics.bookValue?.fmt
+                };
+
+                const ratios = {
+                    PER: quote.summaryDetail.trailingPE?.fmt,
+                    PCF: quote.defaultKeyStatistics.priceToCashFlow?.fmt,
+                    PSR: quote.summaryDetail.priceToSalesTrailing12Months?.fmt,
+                    PBR: quote.defaultKeyStatistics.priceToBook?.fmt
+                };
+
+                displayResults({ general, fondamentaux, ratios });
+
+            } catch (error) {
+                console.error("Erreur : ", error);
+                alert("Impossible de récupérer les données.");
             }
-
-            const data = await response.json();
-            return data.quoteResponse.result[0];
-        }
-
-        async function getMarketstackHistoricalData(symbol) {
-            const url = `https://api.marketstack.com/v1/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=5`;
-
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Erreur lors de la récupération des données historiques depuis Marketstack pour ${symbol}`);
-            }
-
-            const data = await response.json();
-            return data.data;
         }
 
         function displayResults(data) {
-            let html = '<div class="section"><h3>Données actuelles (Marketstack)</h3><pre>' + JSON.stringify(data.marketstackCurrentData, null, 2) + '</pre></div>';
-            html += '<div class="section"><h3>Données actuelles (Yahoo Finance)</h3><pre>' + JSON.stringify(data.yahooFinanceCurrentData, null, 2) + '</pre></div>';
-            html += '<div class="section"><h3>Données historiques (Marketstack)</h3><pre>' + JSON.stringify(data.marketstackHistoricalData, null, 2) + '</pre></div>';
-            document.getElementById('results').innerHTML = html;
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            const genSection = createSection("Données Générales", data.general);
+            const fundSection = createSection("Données Fondamentales Actuelles", data.fondamentaux);
+            const ratiosSection = createSection("Ratios Financiers", data.ratios);
+
+            resultsDiv.appendChild(genSection);
+            resultsDiv.appendChild(fundSection);
+            resultsDiv.appendChild(ratiosSection);
+        }
+
+        function createSection(title, obj) {
+            const div = document.createElement('div');
+            div.className = 'section';
+            const h2 = document.createElement('h2');
+            h2.textContent = title;
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(obj, null, 2);
+            div.appendChild(h2);
+            div.appendChild(pre);
+            return div;
         }
     </script>
+
 </body>
 </html>
