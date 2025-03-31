@@ -37,6 +37,15 @@
       box-shadow: 0 0 5px rgba(0,0,0,0.1);
       margin: 20px 0;
     }
+    .toggle-btn {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -122,9 +131,20 @@
       section.className = 'section';
       const h2 = document.createElement('h2');
       h2.textContent = title;
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.textContent = 'Afficher/Masquer';
+      toggleBtn.className = 'toggle-btn';
+
       const pre = document.createElement('pre');
       pre.textContent = JSON.stringify(dataObj, null, 2);
+
+      toggleBtn.onclick = () => {
+        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+      };
+
       section.appendChild(h2);
+      section.appendChild(toggleBtn);
       section.appendChild(pre);
       document.getElementById('results').appendChild(section);
     }
