@@ -1,106 +1,153 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Test Yahoo Finance TimeSeries</title>
-  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Données Boursières</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h3 {
+            margin-bottom: 10px;
+        }
+        .section pre {
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            overflow-x: auto;
+        }
+        #loader {
+            text-align: center;
+            display: none;
+        }
+    </style>
 </head>
 <body>
-  <h2>📊 Évolution des ratios financiers pour IBM (5 dernières années)</h2>
-  <canvas id="chart" width="800" height="400"></canvas>
+    <h1>Récupérer les données boursières d'une action</h1>
 
-  <script>
-    const headers = {
-      'X-RapidAPI-Key': 'TA_VRAIE_CLÉ_ICI',
-      'X-RapidAPI-Host': 'apidojo-yahoo-finance-v1.p.rapidapi.com'
-    };
+    <div>
+        <label for="symbol">Entrez le symbole de l'action (ex: AAPL, TSLA) :</label>
+        <input type="text" id="symbol" placeholder="Ex : AAPL">
+        <button onclick="fetchStockData()">Obtenir les données</button>
+    </div>
 
-    async function fetchRatiosData() {
-      try {
-        const response = await axios.get(
-          'https://apidojo-yahoo-finance-v1.p.rapidapi.com/stock/v2/get-timeseries',
-          {
-            params: {
-              symbol: 'IBM',
-              region: 'US',
-              period1: '1571590800',
-              period2: '1711344000'
-            },
-            headers: headers
-          }
-        );
+    <div id="loader">
+        <p>Chargement des données...</p>
+    </div>
 
-        const timeseries = response.data?.timeseries;
-        if (!timeseries || !Array.isArray(timeseries)) {
-          throw new Error('Pas de données disponibles.');
+    <div id="results"></div>
+
+    <script>
+        // Remplacez ces valeurs par vos propres clés API
+        const marketstackApiKey = '0e11e33f8b7a6385b3a4610a242222aa';
+        const yahooFinanceApiKey = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
+
+        async function fetchStockData() {
+            const symbol = document.getElementById('symbol').value.trim();
+
+            if (!symbol) {
+                alert('Veuillez entrer un symbole d\'action.');
+                return;
+            }
+
+            // Afficher le loader
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('results').innerHTML = '';
+
+            try {
+                const stockData = await getStockData(symbol);
+
+                // Masquer le loader
+                document.getElementById('loader').style.display = 'none';
+
+                // Afficher les résultats
+                displayResults(stockData);
+            } catch (error) {
+                // Masquer le loader en cas d'erreur
+                document.getElementById('loader').style.display = 'none';
+                alert('Une erreur est survenue lors de la récupération des données.');
+                console.error(error);
+            }
         }
 
-        const data = timeseries.find(series => series.meta.symbol === 'IBM');
+        async function getStockData(symbol) {
+            try {
+                const marketstackCurrentData = await getMarketstackCurrentData(symbol);
+                const yahooFinanceCurrentData = await getYahooFinanceCurrentData(symbol);
+                const marketstackHistoricalData = await getMarketstackHistoricalData(symbol);
 
-        const dates = data.timestamp.map(ts => new Date(ts * 1000).toLocaleDateString());
-
-        const extractSeries = (seriesKey) => {
-          return data.series?.[seriesKey]?.map(val => val.raw) || new Array(dates.length).fill(null);
-        };
-
-        const datasets = [
-          {
-            label: 'PER',
-            data: extractSeries('trailingPe'),
-            borderColor: '#007BFF',
-            fill: false,
-            tension: 0.3
-          },
-          {
-            label: 'PBR (Price to Book)',
-            data: extractSeries('priceToBook'),
-            borderColor: '#28a745',
-            fill: false,
-            tension: 0.3
-          },
-          {
-            label: 'PSR (Price to Sales)',
-            data: extractSeries('priceToSalesTrailing12Months'),
-            borderColor: '#ffc107',
-            fill: false,
-            tension: 0.3
-          },
-          {
-            label: 'PCF (Price to Cash Flow)',
-            data: extractSeries('priceToCashflow'),
-            borderColor: '#dc3545',
-            fill: false,
-            tension: 0.3
-          }
-        ];
-
-        const ctx = document.getElementById('chart').getContext('2d');
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: dates,
-            datasets: datasets
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: { position: 'top' }
-            },
-            scales: {
-              x: { title: { display: true, text: "Date" } },
-              y: { title: { display: true, text: "Valeur du ratio" } }
+                return {
+                    marketstackCurrentData,
+                    yahooFinanceCurrentData,
+                    marketstackHistoricalData
+                };
+            } catch (error) {
+                console.error("Erreur lors de la récupération des données boursières :", error);
+                throw error;
             }
-          }
-        });
+        }
 
-      } catch (err) {
-        console.error('Erreur Yahoo:', err);
-        document.body.innerHTML += `<p style='color:red;'>${err.message}</p>`;
-      }
-    }
+        async function getMarketstackCurrentData(symbol) {
+            const url = `https://api.marketstack.com/v1/eod/latest?access_key=${marketstackApiKey}&symbols=${symbol}`;
 
-    fetchRatiosData();
-  </script>
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Erreur lors de la récupération des données actuelles depuis Marketstack pour ${symbol}`);
+            }
+
+            const data = await response.json();
+            return data.data[0];
+        }
+
+        async function getYahooFinanceCurrentData(symbol) {
+            const url = `https://yfapi.net/v6/finance/quote?symbols=${symbol}`;
+
+            const response = await fetch(url, {
+                headers: {
+                    'x-api-key': yahooFinanceApiKey
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erreur lors de la récupération des données actuelles depuis Yahoo Finance pour ${symbol}`);
+            }
+
+            const data = await response.json();
+            return data.quoteResponse.result[0];
+        }
+
+        async function getMarketstackHistoricalData(symbol) {
+            const url = `https://api.marketstack.com/v1/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=5`;
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Erreur lors de la récupération des données historiques depuis Marketstack pour ${symbol}`);
+            }
+
+            const data = await response.json();
+            return data.data;
+        }
+
+        function displayResults(data) {
+            let html = '<div class="section"><h3>Données actuelles (Marketstack)</h3><pre>' + JSON.stringify(data.marketstackCurrentData, null, 2) + '</pre></div>';
+            html += '<div class="section"><h3>Données actuelles (Yahoo Finance)</h3><pre>' + JSON.stringify(data.yahooFinanceCurrentData, null, 2) + '</pre></div>';
+            html += '<div class="section"><h3>Données historiques (Marketstack)</h3><pre>' + JSON.stringify(data.marketstackHistoricalData, null, 2) + '</pre></div>';
+            document.getElementById('results').innerHTML = html;
+        }
+    </script>
 </body>
 </html>
