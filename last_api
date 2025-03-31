@@ -53,8 +53,8 @@
 
     <script>
         // Remplacez ces valeurs par vos propres clés API
-        const marketstackApiKey = '0e11e33f8b7a6385b3a4610a242222aa';
-        const yahooFinanceApiKey = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
+        const marketstackApiKey = '';
+        const yahooFinanceApiKey = '';
 
         async function fetchStockData() {
             const symbol = document.getElementById('symbol').value.trim();
