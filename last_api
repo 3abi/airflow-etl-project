@@ -1,137 +1,134 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tableau de bord boursier</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-      padding: 20px;
-    }
-    input, button {
-      padding: 8px;
-      margin-right: 10px;
-    }
-    .section {
-      background: #fff;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    h2 {
-      margin-top: 0;
-    }
-    pre {
-      background-color: #eee;
-      padding: 10px;
-      border-radius: 5px;
-      overflow-x: auto;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Exploration des API Boursières</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f8f8f8;
+        }
+        input, button {
+            padding: 8px;
+            font-size: 16px;
+        }
+        #results {
+            margin-top: 30px;
+        }
+        .section {
+            background: #fff;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            margin-bottom: 10px;
+            font-size: 18px;
+            color: #333;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
 </head>
 <body>
-  <h1>Tableau de bord boursier</h1>
-  <input type="text" id="symbol" placeholder="Ex: AAPL">
-  <button onclick="fetchData()">Obtenir les données</button>
 
-  <div id="results"></div>
-  <canvas id="chart" width="800" height="400"></canvas>
+<h1>Exploration API Marketstack & Yahoo Finance</h1>
 
-  <script>
+<label for="symbol">Symbole boursier (ex: AAPL, TSLA) :</label>
+<input type="text" id="symbol" placeholder="Entrez le symbole...">
+<button onclick="getAllStockData()">Obtenir les données</button>
+
+<div id="results"></div>
+
+<script>
     const yahooFinanceApiKey = 'VOTRE_CLE_YAHOO';
     const marketstackApiKey = 'VOTRE_CLE_MARKETSTACK';
 
-    async function fetchData() {
-      const symbol = document.getElementById('symbol').value.trim();
-      if (!symbol) return alert("Entrez un symbole boursier.");
-
-      const yahooUrl = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=price,summaryDetail,defaultKeyStatistics,financialData`;
-      const marketstackUrl = `https://api.marketstack.com/v1/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1300`; // ~5 ans
-
-      try {
-        const [yahooRes, marketRes] = await Promise.all([
-          fetch(yahooUrl, { headers: { 'x-api-key': yahooFinanceApiKey } }),
-          fetch(marketstackUrl)
-        ]);
-
-        const yahooData = await yahooRes.json();
-        const marketData = await marketRes.json();
-
-        const quote = yahooData.quoteSummary.result[0];
-
-        const general = {
-          symbole: symbol,
-          nom: quote.price.longName,
-          exchange: quote.price.exchangeName
-        };
-
-        const fondamentaux = {
-          prixActuel: quote.price.regularMarketPrice?.raw,
-          devise: quote.price.currency,
-          capitalisation: quote.price.marketCap?.fmt,
-          tresorerieParAction: quote.financialData.totalCashPerShare?.fmt,
-          chiffreAffaires: quote.financialData.totalRevenue?.fmt,
-          valeurComptable: quote.defaultKeyStatistics.bookValue?.fmt
-        };
-
-        const ratios = {
-          PER: quote.summaryDetail.trailingPE?.fmt,
-          PCF: quote.defaultKeyStatistics.priceToCashFlow?.fmt,
-          PSR: quote.summaryDetail.priceToSalesTrailing12Months?.fmt,
-          PBR: quote.defaultKeyStatistics.priceToBook?.fmt
-        };
-
-        const historique = marketData.data.reverse().map(item => ({
-          date: item.date.substring(0, 10),
-          close: item.close
-        }));
-
-        afficherResultats({ general, fondamentaux, ratios });
-        tracerGraphique(historique);
-      } catch (err) {
-        console.error(err);
-        alert("Erreur lors de la récupération des données.");
-      }
-    }
-
-    function afficherResultats(data) {
-      const container = document.getElementById('results');
-      container.innerHTML = '';
-      for (const [titre, valeurs] of Object.entries(data)) {
-        const section = document.createElement('div');
-        section.className = 'section';
-        section.innerHTML = `<h2>${titre}</h2><pre>${JSON.stringify(valeurs, null, 2)}</pre>`;
-        container.appendChild(section);
-      }
-    }
-
-    function tracerGraphique(donnees) {
-      const ctx = document.getElementById('chart').getContext('2d');
-      if (window.lineChart) window.lineChart.destroy();
-      window.lineChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: donnees.map(d => d.date),
-          datasets: [{
-            label: 'Cours de Clôture',
-            data: donnees.map(d => d.close),
-            fill: false,
-            borderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            x: { display: true, title: { display: true, text: 'Date' } },
-            y: { display: true, title: { display: true, text: 'Prix ($)' } }
-          }
+    async function getAllStockData() {
+        const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+        if (!symbol) {
+            alert("Veuillez saisir un symbole.");
+            return;
         }
-      });
+
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = "<p>Chargement en cours...</p>";
+
+        try {
+            const [
+                yahooData,
+                marketstackLatest,
+                marketstackHistory
+            ] = await Promise.all([
+                fetchYahooFinanceData(symbol),
+                fetchMarketstackLatest(symbol),
+                fetchMarketstackHistory(symbol)
+            ]);
+
+            displaySection("✅ Données complètes Yahoo Finance", yahooData);
+            displaySection("✅ Données EOD - Actuelles (Marketstack)", marketstackLatest);
+            displaySection("✅ Données Historiques (Marketstack - 5 ans)", marketstackHistory);
+        } catch (err) {
+            console.error(err);
+            resultsDiv.innerHTML = "<p style='color:red;'>Erreur lors de la récupération des données. Consultez la console.</p>";
+        }
     }
-  </script>
+
+    async function fetchYahooFinanceData(symbol) {
+        const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=price,summaryDetail,financialData,defaultKeyStatistics,calendarEvents,earnings,esgScores`;
+
+        const res = await fetch(url, {
+            headers: {
+                'x-api-key': yahooFinanceApiKey
+            }
+        });
+
+        if (!res.ok) throw new Error("Erreur Yahoo Finance");
+        const data = await res.json();
+        return data.quoteSummary.result[0];
+    }
+
+    async function fetchMarketstackLatest(symbol) {
+        const url = `https://api.marketstack.com/v1/eod/latest?access_key=${marketstackApiKey}&symbols=${symbol}`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Erreur Marketstack - Dernier jour");
+
+        const data = await res.json();
+        return data.data[0]; // Dernier jour de bourse
+    }
+
+    async function fetchMarketstackHistory(symbol) {
+        const url = `https://api.marketstack.com/v1/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1200&sort=DESC`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Erreur Marketstack - Historique");
+
+        const data = await res.json();
+        return data.data; // Tous les jours disponibles
+    }
+
+    function displaySection(title, dataObj) {
+        const container = document.createElement("div");
+        container.className = "section";
+
+        const h2 = document.createElement("h2");
+        h2.textContent = title;
+
+        const pre = document.createElement("pre");
+        pre.textContent = JSON.stringify(dataObj, null, 2);
+
+        container.appendChild(h2);
+        container.appendChild(pre);
+        document.getElementById("results").appendChild(container);
+    }
+</script>
+
 </body>
 </html>
