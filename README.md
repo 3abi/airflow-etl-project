@@ -1,92 +1,146 @@
+===============================
+DOCUMENTATION TECHNIQUE - CODE API MARKETSTACK & YAHOO FINANCE
+===============================
 
-# 📊 Exploration des APIs Yahoo Finance & Marketstack
+1. ENDPOINTS API UTILISÉS - MARKETSTACK
+----------------------------------------
 
-Ce projet permet de récupérer un maximum de données financières sur une action boursière en combinant les APIs **Yahoo Finance** et **Marketstack**, avec affichage lisible et graphique.
+[ID] eod_latest
+[Endpoint] /eod/latest
+[Description]
+  Récupère les données de clôture les plus récentes (latest close) pour un symbole donné.
+  Inclut : open, close, high, low, volume, date.
 
----
+[ID] eod_history
+[Endpoint] /eod
+[Description]
+  Récupère l’historique complet des prix quotidiens (EOD = End Of Day) sur plusieurs années.
+  Utilisé pour tracer un graphique d’évolution du prix sur 5 ans.
 
-## 🔷 Yahoo Finance API – Modules disponibles
+[ID] ticker
+[Endpoint] /tickers/{symbol}
+[Description]
+  Retourne des métadonnées sur le titre :
+  - Nom de l’entreprise
+  - Symbole
+  - Marché boursier (exchange)
+  - Devise
 
-### ✅ Modules actuellement utilisés
+[ID] exchanges
+[Endpoint] /exchanges
+[Description]
+  Liste complète des marchés boursiers disponibles dans Marketstack.
+  Exemple : NASDAQ, NYSE, EURONEXT, etc.
 
-| Module               | Description |
-|----------------------|-------------|
-| `price`              | Données de marché en temps réel : prix, devise, market cap, exchange |
-| `summaryDetail`      | Détails comme : PER, dividendes, rendement, PSR, volatilité |
-| `financialData`      | Fondamentaux : revenus, marges, cash par action, endettement |
-| `defaultKeyStatistics` | Statistiques clés : PER, PCF, PBR, bêta, actions en circulation |
-| `calendarEvents`     | Prochaines dates de publication de résultats |
-| `earnings`           | Historique et prévisions de revenus et bénéfices |
-| `esgScores`          | Score ESG (Environnement, Social, Gouvernance) |
+[ID] intraday
+[Endpoint] /intraday
+[Description]
+  Récupère les données minute par minute d’un titre (interval=1min, limit=50).
+  Affiché sous forme de graphique interactif.
+  **Accessible uniquement avec un plan PRO.**
 
----
+[ID] dividends
+[Endpoint] /dividends
+[Description]
+  Retourne l’historique des dividendes pour un titre donné (montant, date, etc.).
+  **Disponible avec plan payant avancé.**
 
-### 🔄 Modules supplémentaires disponibles
+[ID] splits
+[Endpoint] /splits
+[Description]
+  Donne les informations sur les fractionnements d’actions (splits).
+  Exemple : split 2 pour 1 → chaque action devient 2, à moitié du prix.
 
-| Module                    | Description |
-|---------------------------|-------------|
-| `assetProfile`            | Secteur, industrie, description, employés, dirigeants |
-| `recommendationTrend`     | Recommandations d’analystes (achat, neutre, vente) |
-| `upgradeDowngradeHistory` | Historique des recommandations (agences, dates, actions) |
-| `insiderHolders`          | Actionnaires internes (dirigeants, membres du board) |
-| `insiderTransactions`     | Transactions récentes d’insiders |
-| `majorHoldersBreakdown`   | Répartition : institutionnels, fonds, particuliers |
-| `incomeStatementHistory`  | Compte de résultat : chiffre d'affaires, bénéfices |
-| `balanceSheetHistory`     | Bilan : actifs, passifs, capitaux propres |
-| `cashflowStatementHistory`| Flux de trésorerie opérationnel/investissement/financement |
-| `netSharePurchaseActivity`| Historique des rachats ou émissions d’actions |
-| `sectorTrend`             | Tendances par secteur (peut être vide selon les cas) |
-| `quoteType`               | Type d’actif (action, ETF, crypto, etc.) |
+--------------------------------------------------
 
-> 📌 **Exemple d’appel complet :**
+2. MODULES YAHOO FINANCE UTILISÉS
+----------------------------------
 
+L’API de Yahoo est appelée via :
+  https://yfapi.net/v11/finance/quoteSummary/{symbol}?modules=...
 
----
+Liste des modules appelés :
 
-## 🟨 Marketstack API – Endpoints disponibles
+- price :
+    Dernier prix, capitalisation boursière, volume
 
-### ✅ Endpoints utilisés
+- summaryDetail :
+    PER, dividende, beta, rendement
 
-| Endpoint            | Description |
-|---------------------|-------------|
-| `/v1/eod/latest`    | Dernier cours de clôture (EOD = End Of Day) |
-| `/v1/eod`           | Historique des cours (limite max : 5 ans env.) |
+- financialData :
+    Chiffre d'affaires, bénéfice net, cashflow
 
----
+- defaultKeyStatistics :
+    EPS, shares outstanding, market cap
 
-### 🔄 Autres endpoints disponibles
+- calendarEvents :
+    Prochains résultats, dividendes à venir
 
-| Endpoint                    | Description |
-|-----------------------------|-------------|
-| `/v1/tickers`               | Liste complète des tickers et leurs métadonnées |
-| `/v1/exchanges`             | Marchés supportés (NASDAQ, NYSE, Euronext…) |
-| `/v1/intraday` *(PRO)*      | Données intraday minute par minute |
-| `/v1/dividends` *(PRO)*     | Historique des dividendes (date, montant) |
-| `/v1/splits` *(PRO)*        | Historique des splits d’actions |
-| `/v1/tickers/{symbol}` *(PRO)* | Métadonnées d’un ticker donné |
+- earnings :
+    Résultats financiers trimestriels et annuels
 
----
+- esgScores :
+    Score ESG (Environnement, Social, Gouvernance)
 
-### ✅ Exemple de réponse `/eod/latest`
+- assetProfile :
+    Description de l’entreprise, secteur, pays, employés
 
-```json
-{
-  "symbol": "AAPL",
-  "exchange": "XNAS",
-  "date": "2025-03-28T00:00:00+0000",
-  "open": 175.00,
-  "high": 178.00,
-  "low": 173.50,
-  "close": 176.25,
-  "volume": 78945600
-}
+- recommendationTrend :
+    Recommandations des analystes
 
+- upgradeDowngradeHistory :
+    Changements de notation des analystes
 
-## 🔚 Comparatif global des APIs
+- insiderHolders :
+    Infos sur les actionnaires internes
 
-| Source         | Type        | Données financières | Ratios | Profil entreprise | Recos analystes | ESG  | Intraday       | Historique |
-|----------------|-------------|----------------------|--------|-------------------|------------------|------|----------------|------------|
-| **Yahoo Finance**  | Modules     | ✅ Oui               | ✅ Oui | ✅ Oui            | ✅ Oui           | ✅   | ❌             | ✅          |
-| **Marketstack**    | Endpoints   | ❌                   | ❌     | ❌                | ❌               | ❌   | ✅ *(PRO uniquement)* | ✅          |
+- insiderTransactions :
+    Achats/ventes récents des dirigeants
 
+- majorHoldersBreakdown :
+    Répartition actionnariale
 
+- incomeStatementHistory :
+    Compte de résultat
+
+- balanceSheetHistory :
+    Bilan
+
+- cashflowStatementHistory :
+    Flux de trésorerie
+
+- netSharePurchaseActivity :
+    Achat net d’actions
+
+- sectorTrend :
+    Tendances sectorielles
+
+- quoteType :
+    Type de l’actif : Action, ETF, etc.
+
+--------------------------------------------------
+
+3. MÉCANISMES DU SCRIPT
+------------------------
+
+- Tous les endpoints sont appelés séquentiellement.
+- Si une API échoue (ex: 403, 429), une section d’erreur est affichée.
+- Les données sont présentées sous forme :
+    - JSON brut (pour inspection technique)
+    - Affichage lisible pour les données importantes (nom, symbole, exchange, etc.)
+- Deux graphiques sont générés :
+    - Graphique historique EOD (5 ans)
+    - Graphique intraday (1min)
+
+--------------------------------------------------
+
+4. CONDITIONS D’UTILISATION / LIMITES
+-------------------------------------
+
+- L’API Marketstack limite certains endpoints aux plans payants ou PRO.
+- L’API Yahoo nécessite une clé `x-api-key` valide.
+- Certaines données peuvent ne pas être disponibles selon le symbole recherché.
+
+--------------------------------------------------
+
+FIN DU DOCUMENT
