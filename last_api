@@ -1,197 +1,29 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>Exploration complète API Boursières</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      padding: 20px;
-    }
-    input, button {
-      padding: 8px;
-      font-size: 16px;
-    }
-    .section {
-      background: #fff;
-      margin: 20px 0;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    h1, h2 {
-      color: #333;
-    }
-    pre {
-      background: #f0f0f0;
-      padding: 10px;
-      border-radius: 5px;
-      overflow-x: auto;
-    }
-    canvas {
-      background: #fff;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-      margin: 20px 0;
-    }
-    .toggle-btn {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      margin-bottom: 10px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <h1>Exploration complète des APIs Marketstack & Yahoo Finance</h1>
-  <label for="symbol">Symbole boursier :</label>
-  <input type="text" id="symbol" placeholder="Ex : AAPL">
-  <button onclick="getAllStockData()">Obtenir les données</button>
-
-  <canvas id="priceChart" width="800" height="400"></canvas>
-  <div id="results"></div>
-
-  <script>
-    const yahooFinanceApiKey = 'VOTRE_CLE_YAHOO';
-    const marketstackApiKey = 'VOTRE_CLE_MARKETSTACK';
-
-    async function getAllStockData() {
-      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
-      if (!symbol) return alert("Veuillez saisir un symbole.");
-
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '<p>Chargement...</p>';
-
-      try {
-        const [
-          yahooData,
-          marketLatest,
-          marketHistory,
-          marketDividends,
-          marketSplits,
-          marketExchanges,
-          marketTickers,
-          marketIntraday
-        ] = await Promise.all([
-          fetchYahooFinanceData(symbol),
-          fetchMarketstackEndpoint(`/eod/latest?access_key=${marketstackApiKey}&symbols=${symbol}`),
-          fetchMarketstackEndpoint(`/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1200&sort=DESC`),
-          fetchMarketstackEndpoint(`/dividends?access_key=${marketstackApiKey}&symbols=${symbol}`),
-          fetchMarketstackEndpoint(`/splits?access_key=${marketstackApiKey}&symbols=${symbol}`),
-          fetchMarketstackEndpoint(`/exchanges?access_key=${marketstackApiKey}`),
-          fetchMarketstackEndpoint(`/tickers?access_key=${marketstackApiKey}&limit=100`),
-          fetchMarketstackEndpoint(`/intraday?access_key=${marketstackApiKey}&symbols=${symbol}&interval=1min&limit=50`)
-        ]);
-
-        resultsDiv.innerHTML = '';
-        for (const [key, value] of Object.entries(yahooData)) {
-          displaySection(`\u2728 Module Yahoo : ${key}`, value);
-        }
-        displaySection("\u2705 Marketstack - Données EOD actuelles", marketLatest.data?.[0] || marketLatest);
-        displaySection("\u23F2\uFE0F Marketstack - Historique (5 ans)", marketHistory.data || marketHistory);
-        displaySection("\uD83C\uDF40 Marketstack - Dividendes", marketDividends.data || marketDividends);
-        displaySection("\uD83D\uDD04 Marketstack - Splits", marketSplits.data || marketSplits);
-        displaySection("\uD83C\uDF10 Marketstack - Exchanges", marketExchanges.data || marketExchanges);
-        displaySection("\uD83D\uDCCB Marketstack - Tickers", marketTickers.data || marketTickers);
-        displaySection("\u23F1\uFE0F Marketstack - Intraday (1min)", marketIntraday.data || marketIntraday);
-
-        plotPriceChart(marketHistory.data || marketHistory);
-      } catch (error) {
-        console.error(error);
-        resultsDiv.innerHTML = '<p style="color:red">Erreur lors de la récupération des données. Consultez la console.</p>';
-      }
-    }
-
-    async function fetchYahooFinanceData(symbol) {
-      const modules = [
-        "price","summaryDetail","financialData","defaultKeyStatistics",
-        "calendarEvents","earnings","esgScores","assetProfile",
-        "recommendationTrend","upgradeDowngradeHistory","insiderHolders",
-        "insiderTransactions","majorHoldersBreakdown","incomeStatementHistory",
-        "balanceSheetHistory","cashflowStatementHistory","netSharePurchaseActivity",
-        "sectorTrend","quoteType"
-      ].join(',');
-
-      const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=${modules}`;
-
-      const response = await fetch(url, {
-        headers: { 'x-api-key': yahooFinanceApiKey }
-      });
-      if (!response.ok) throw new Error('Erreur Yahoo Finance');
-
-      const json = await response.json();
-      return json.quoteSummary.result[0];
-    }
-
-    async function fetchMarketstackEndpoint(endpoint) {
-      const url = `https://api.marketstack.com/v1${endpoint}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Erreur API Marketstack : " + endpoint);
-      return await res.json();
-    }
-
-    function displaySection(title, dataObj) {
-      const section = document.createElement('div');
-      section.className = 'section';
-      const h2 = document.createElement('h2');
-      h2.textContent = title;
-
-      const toggleBtn = document.createElement('button');
-      toggleBtn.textContent = 'Afficher/Masquer';
-      toggleBtn.className = 'toggle-btn';
-
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(dataObj, null, 2);
-
-      toggleBtn.onclick = () => {
-        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
-      };
-
-      section.appendChild(h2);
-      section.appendChild(toggleBtn);
-      section.appendChild(pre);
-      document.getElementById('results').appendChild(section);
-    }
-
-    function plotPriceChart(data) {
-      const sorted = data.slice().reverse();
-      const labels = sorted.map(item => item.date.substring(0, 10));
-      const prices = sorted.map(item => item.close);
-
-      const ctx = document.getElementById('priceChart').getContext('2d');
-      if (window.priceChartInstance) window.priceChartInstance.destroy();
-
-      window.priceChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Prix de clôture (Marketstack)',
-            data: prices,
-            borderColor: 'blue',
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: false
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'top' }
-          },
-          scales: {
-            x: { display: true, title: { display: true, text: 'Date' } },
-            y: { display: true, title: { display: true, text: 'Prix ($)' } }
-          }
-        }
-      });
-    }
-  </script>
-</body>
-</html>
+marketstack_yahoo - …es modules.html:134 
+ 
+ GET https://api.marketstack.com/v1/exchanges?access_key=0e11e33… 429 (Too Many Requests)
+fetchMarketstackEndpoint	@	marketstack_yahoo - …es modules.html:134
+getAllStockData	@	marketstack_yahoo - …les modules.html:87
+onclick	@	marketstack_yahoo - …les modules.html:55
+marketstack_yahoo - …es modules.html:106 
+ Error: Erreur API Marketstack : /exchanges?access_key=
+    at fetchMarketstackEndpoint (marketstack_yahoo - …modules.html:135:26)
+    at async Promise.all (index 5)
+    at async getAllStockData (marketstack_yahoo - … modules.html:81:13)
+getAllStockData	@	marketstack_yahoo - …es modules.html:106
+await in getAllStockData		
+onclick	@	marketstack_yahoo - …les modules.html:55
+marketstack_yahoo - …es modules.html:134 
+ 
+ GET https://api.marketstack.com/v1/dividends?access_key=0e11e33…&symbols=AAPL 429 (Too Many Requests)
+fetchMarketstackEndpoint	@	marketstack_yahoo - …es modules.html:134
+getAllStockData	@	marketstack_yahoo - …les modules.html:85
+onclick	@	marketstack_yahoo - …les modules.html:55
+[NOUVEAU] Expliquez les erreurs de la console à l’aide de Copilot pour Edge : cliquez sur 
+ pour expliquer une erreur. En savoir plus
+Ne plus afficher
+marketstack_yahoo - …es modules.html:134 
+ 
+ GET https://api.marketstack.com/v1/intraday?access_key=0e11e33…&symbols=AAPL&interval=1min&limit=50 403 (Forbidden)
+fetchMarketstackEndpoint	@	marketstack_yahoo - …es modules.html:134
+getAllStockData	@	marketstack_yahoo - …les modules.html:89
+onclick	@	marketstack_yahoo - …les modules.html:55
