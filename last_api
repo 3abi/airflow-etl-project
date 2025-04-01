@@ -1,254 +1,33 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>Exploration complète API Boursières</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      padding: 20px;
-    }
-    input, button {
-      padding: 8px;
-      font-size: 16px;
-    }
-    .section {
-      background: #fff;
-      margin: 20px 0;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    h1, h2 {
-      color: #333;
-    }
-    pre {
-      background: #f0f0f0;
-      padding: 10px;
-      border-radius: 5px;
-      overflow-x: auto;
-    }
-    canvas {
-      background: #fff;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-      margin: 20px 0;
-    }
-    .toggle-btn {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      margin-bottom: 10px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <h1>Exploration complète des APIs Marketstack & Yahoo Finance</h1>
-  <label for="symbol">Symbole boursier :</label>
-  <input type="text" id="symbol" placeholder="Ex : AAPL">
-  <button onclick="getAllStockData()">Obtenir les données</button>
+📚 Documentation – Endpoints Marketstack & Modules Yahoo utilisés
+🟨 1. Marketstack – Endpoints utilisés
+ID (code)	Endpoint	Rôle dans l'application
+eod_latest	/eod/latest	Récupère les dernières données de clôture d’une action. Utilisé pour afficher le prix actuel, le volume, l’ouverture, la clôture, etc.
+eod_history	/eod	Fournit l’historique complet des données EOD (End of Day) sur plusieurs années. Sert à construire le graphique d’évolution du prix sur 5 ans.
+ticker	/tickers/{symbol}	Récupère les données générales sur le titre : nom de l’entreprise, symbole, devise, marché boursier. Ces données sont affichées de façon lisible dans un encadré.
+exchanges	/exchanges	Liste tous les marchés boursiers supportés par Marketstack (ex : NASDAQ, NYSE, EURONEXT…). Cela permet de connaître les places boursières disponibles.
+intraday	/intraday	Permet de récupérer les cours minute par minute. Affiche un graphique intraday en temps réel (si plan PRO).
+dividends	/dividends	Donne l’historique des dividendes d’un titre. Utile pour analyser les performances à long terme d’un actif.
+splits	/splits	Fournit les informations sur les fractionnements d’actions (splits) – par ex. quand une action est divisée 2 pour 1.
+🟦 2. Yahoo Finance – Modules API
+Le script utilise l’API https://yfapi.net/v11/finance/quoteSummary/{symbol} avec un ensemble de modules détaillés, dont :
 
-  <canvas id="priceChart" width="800" height="400"></canvas>
-  <canvas id="intradayChart" width="800" height="400"></canvas>
-  <div id="results"></div>
-
-  <script>
-    const yahooFinanceApiKey = 'VOTRE_CLE_YAHOO';
-    const marketstackApiKey = 'VOTRE_CLE_MARKETSTACK';
-
-    async function fetchYahooFinanceData(symbol) {
-      const modules = [
-        "price","summaryDetail","financialData","defaultKeyStatistics",
-        "calendarEvents","earnings","esgScores","assetProfile",
-        "recommendationTrend","upgradeDowngradeHistory","insiderHolders",
-        "insiderTransactions","majorHoldersBreakdown","incomeStatementHistory",
-        "balanceSheetHistory","cashflowStatementHistory","netSharePurchaseActivity",
-        "sectorTrend","quoteType"
-      ].join(',');
-
-      const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=${modules}`;
-
-      const response = await fetch(url, {
-        headers: { 'x-api-key': yahooFinanceApiKey }
-      });
-      if (!response.ok) throw new Error('Erreur Yahoo Finance');
-
-      const json = await response.json();
-      return json.quoteSummary.result[0];
-    }
-
-    async function fetchMarketstackEndpoint(endpoint) {
-      const url = `https://api.marketstack.com/v1${endpoint}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Erreur API Marketstack : ${endpoint} (Code ${res.status})`);
-      return await res.json();
-    }
-
-    function displaySection(title, dataObj) {
-      const section = document.createElement('div');
-      section.className = 'section';
-      const h2 = document.createElement('h2');
-      h2.textContent = title;
-
-      const toggleBtn = document.createElement('button');
-      toggleBtn.textContent = 'Afficher/Masquer';
-      toggleBtn.className = 'toggle-btn';
-
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(dataObj, null, 2);
-
-      toggleBtn.onclick = () => {
-        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
-      };
-
-      section.appendChild(h2);
-      section.appendChild(toggleBtn);
-      section.appendChild(pre);
-      document.getElementById('results').appendChild(section);
-    }
-
-    function displayReadableTicker(data) {
-      if (!data) return;
-      const section = document.createElement('div');
-      section.className = 'section';
-      const h2 = document.createElement('h2');
-      h2.textContent = '📌 Détails lisibles du ticker';
-
-      const content = document.createElement('p');
-      content.innerHTML = `
-        <strong>Nom de l’entreprise :</strong> ${data.name || 'N/A'}<br>
-        <strong>Symbole :</strong> ${data.symbol || 'N/A'}<br>
-        <strong>Exchange :</strong> ${data.stock_exchange?.name || 'N/A'} (${data.stock_exchange?.acronym || ''})<br>
-        <strong>Devise :</strong> ${data.currency || 'N/A'}
-      `;
-      section.appendChild(h2);
-      section.appendChild(content);
-      document.getElementById('results').appendChild(section);
-    }
-
-    function plotPriceChart(data) {
-      const sorted = data.slice().reverse();
-      const labels = sorted.map(item => item.date.substring(0, 10));
-      const prices = sorted.map(item => item.close);
-
-      const ctx = document.getElementById('priceChart').getContext('2d');
-      if (window.priceChartInstance) window.priceChartInstance.destroy();
-
-      window.priceChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Prix de clôture (Marketstack)',
-            data: prices,
-            borderColor: 'blue',
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: false
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'top' }
-          },
-          scales: {
-            x: { display: true, title: { display: true, text: 'Date' } },
-            y: { display: true, title: { display: true, text: 'Prix ($)' } }
-          }
-        }
-      });
-    }
-
-    function plotIntradayChart(data) {
-      if (!Array.isArray(data)) return;
-      const sorted = data.slice().reverse();
-      const labels = sorted.map(item => item.date.split('T')[1]?.substring(0,5));
-      const prices = sorted.map(item => item.close);
-
-      const ctx = document.getElementById('intradayChart').getContext('2d');
-      if (window.intradayChartInstance) window.intradayChartInstance.destroy();
-
-      window.intradayChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Intraday (1min)',
-            data: prices,
-            borderColor: 'green',
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: false
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'top' }
-          },
-          scales: {
-            x: { display: true, title: { display: true, text: 'Heure (UTC)' } },
-            y: { display: true, title: { display: true, text: 'Prix ($)' } }
-          }
-        }
-      });
-    }
-
-    // Appel principal
-    async function getAllStockData() {
-      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
-      if (!symbol) return alert("Veuillez saisir un symbole.");
-
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '<p>Chargement...</p>';
-
-      const endpoints = [
-        { id: 'eod_latest', title: '📈 Données EOD actuelles', path: `/eod/latest?access_key=${marketstackApiKey}&symbols=${symbol}` },
-        { id: 'eod_history', title: '🕰️ Historique (5 ans)', path: `/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1200&sort=DESC` },
-        { id: 'ticker', title: 'ℹ️ Informations Ticker', path: `/tickers/${symbol}?access_key=${marketstackApiKey}` },
-        { id: 'exchanges', title: '🌍 Marchés Boursiers (Exchanges)', path: `/exchanges?access_key=${marketstackApiKey}` },
-        { id: 'intraday', title: '⏱️ Intraday 1min', path: `/intraday?access_key=${marketstackApiKey}&symbols=${symbol}&interval=1min&limit=50` },
-        { id: 'dividends', title: '💰 Dividendes', path: `/dividends?access_key=${marketstackApiKey}&symbols=${symbol}` },
-        { id: 'splits', title: '🔀 Fractionnements d’actions (Splits)', path: `/splits?access_key=${marketstackApiKey}&symbols=${symbol}` }
-      ];
-
-      try {
-        const yahooData = await fetchYahooFinanceData(symbol);
-        resultsDiv.innerHTML = '';
-
-        for (const [key, value] of Object.entries(yahooData)) {
-          displaySection(`✨ Module Yahoo : ${key}`, value);
-        }
-
-        for (const endpoint of endpoints) {
-          try {
-            const data = await fetchMarketstackEndpoint(endpoint.path);
-            displaySection(`✅ Marketstack - ${endpoint.title}`, data.data || data);
-            if (endpoint.id === 'eod_history') {
-              plotPriceChart(data.data || data);
-            }
-            if (endpoint.id === 'intraday') {
-              plotIntradayChart(data.data || data);
-            }
-            if (endpoint.id === 'ticker') {
-              displayReadableTicker(data.data);
-            }
-          } catch (e) {
-            displaySection(`❌ Marketstack - ${endpoint.title}`, { erreur: e.message });
-          }
-        }
-      } catch (error) {
-        console.error(error);
-        resultsDiv.innerHTML = '<p style="color:red">Erreur globale lors de la récupération des données. Consultez la console.</p>';
-      }
-    }
-  </script>
-</body>
-</html>
+Nom du module	Contenu récupéré
+price	Prix de l’action, capitalisation, volume
+summaryDetail	Données de résumé : dividende, PER, beta, etc.
+financialData	Données financières détaillées : chiffre d’affaires, EBITDA, flux de trésorerie, endettement
+defaultKeyStatistics	Statistiques clés : EPS, rendement, nombre d’actions
+calendarEvents	Événements à venir : date des résultats, dividendes
+earnings	Résultats trimestriels / annuels (revenus, bénéfices)
+esgScores	Score ESG (environnement, social, gouvernance)
+assetProfile	Description de l’entreprise (secteur, bio, nombre d’employés)
+recommendationTrend	Tendances d’analystes (achat, vente, hold)
+upgradeDowngradeHistory	Historique des notations d’analystes
+insiderHolders	Infos sur les actionnaires internes (CEO, CFO)
+insiderTransactions	Achats/ventes effectués par les dirigeants
+majorHoldersBreakdown	Répartition des actionnaires principaux
+incomeStatementHistory	Compte de résultat
+balanceSheetHistory	Bilan comptable
+cashflowStatementHistory	Flux de trésorerie
+netSharePurchaseActivity	Activité d’achat net d’actions
+sectorTrend	Tendances sectorielles
+quoteType	Type de l’actif (Action, ETF, etc.)
