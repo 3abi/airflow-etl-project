@@ -69,20 +69,39 @@
       resultsDiv.innerHTML = '<p>Chargement...</p>';
 
       try {
-        const [yahooData, marketLatest, marketHistory] = await Promise.all([
+        const [
+          yahooData,
+          marketLatest,
+          marketHistory,
+          marketDividends,
+          marketSplits,
+          marketExchanges,
+          marketTickers,
+          marketIntraday
+        ] = await Promise.all([
           fetchYahooFinanceData(symbol),
-          fetchMarketstackLatest(symbol),
-          fetchMarketstackHistory(symbol)
+          fetchMarketstackEndpoint(`/eod/latest?access_key=${marketstackApiKey}&symbols=${symbol}`),
+          fetchMarketstackEndpoint(`/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1200&sort=DESC`),
+          fetchMarketstackEndpoint(`/dividends?access_key=${marketstackApiKey}&symbols=${symbol}`),
+          fetchMarketstackEndpoint(`/splits?access_key=${marketstackApiKey}&symbols=${symbol}`),
+          fetchMarketstackEndpoint(`/exchanges?access_key=${marketstackApiKey}`),
+          fetchMarketstackEndpoint(`/tickers?access_key=${marketstackApiKey}&limit=100`),
+          fetchMarketstackEndpoint(`/intraday?access_key=${marketstackApiKey}&symbols=${symbol}&interval=1min&limit=50`)
         ]);
 
         resultsDiv.innerHTML = '';
         for (const [key, value] of Object.entries(yahooData)) {
           displaySection(`\u2728 Module Yahoo : ${key}`, value);
         }
-        displaySection("\u2705 Marketstack - Données EOD actuelles", marketLatest);
-        displaySection("\u23F2\uFE0F Marketstack - Historique (5 ans)", marketHistory);
+        displaySection("\u2705 Marketstack - Données EOD actuelles", marketLatest.data?.[0] || marketLatest);
+        displaySection("\u23F2\uFE0F Marketstack - Historique (5 ans)", marketHistory.data || marketHistory);
+        displaySection("\uD83C\uDF40 Marketstack - Dividendes", marketDividends.data || marketDividends);
+        displaySection("\uD83D\uDD04 Marketstack - Splits", marketSplits.data || marketSplits);
+        displaySection("\uD83C\uDF10 Marketstack - Exchanges", marketExchanges.data || marketExchanges);
+        displaySection("\uD83D\uDCCB Marketstack - Tickers", marketTickers.data || marketTickers);
+        displaySection("\u23F1\uFE0F Marketstack - Intraday (1min)", marketIntraday.data || marketIntraday);
 
-        plotPriceChart(marketHistory);
+        plotPriceChart(marketHistory.data || marketHistory);
       } catch (error) {
         console.error(error);
         resultsDiv.innerHTML = '<p style="color:red">Erreur lors de la récupération des données. Consultez la console.</p>';
@@ -110,20 +129,11 @@
       return json.quoteSummary.result[0];
     }
 
-    async function fetchMarketstackLatest(symbol) {
-      const url = `https://api.marketstack.com/v1/eod/latest?access_key=${marketstackApiKey}&symbols=${symbol}`;
+    async function fetchMarketstackEndpoint(endpoint) {
+      const url = `https://api.marketstack.com/v1${endpoint}`;
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Erreur Marketstack latest");
-      const data = await res.json();
-      return data.data[0];
-    }
-
-    async function fetchMarketstackHistory(symbol) {
-      const url = `https://api.marketstack.com/v1/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1200&sort=DESC`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Erreur Marketstack historique");
-      const data = await res.json();
-      return data.data;
+      if (!res.ok) throw new Error("Erreur API Marketstack : " + endpoint);
+      return await res.json();
     }
 
     function displaySection(title, dataObj) {
