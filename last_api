@@ -73,12 +73,14 @@
           yahooData,
           marketLatest,
           marketHistory,
-          marketTickerInfo
+          marketTickerInfo,
+          marketExchanges
         ] = await Promise.all([
           fetchYahooFinanceData(symbol),
           fetchMarketstackEndpoint(`/eod/latest?access_key=${marketstackApiKey}&symbols=${symbol}`),
           fetchMarketstackEndpoint(`/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1200&sort=DESC`),
-          fetchMarketstackEndpoint(`/tickers/${symbol}?access_key=${marketstackApiKey}`)
+          fetchMarketstackEndpoint(`/tickers/${symbol}?access_key=${marketstackApiKey}`),
+          fetchMarketstackEndpoint(`/exchanges?access_key=${marketstackApiKey}`)
         ]);
 
         resultsDiv.innerHTML = '';
@@ -88,6 +90,7 @@
         displaySection("\u2705 Marketstack - Données EOD actuelles", marketLatest.data?.[0] || marketLatest);
         displaySection("\u23F2\uFE0F Marketstack - Historique (5 ans)", marketHistory.data || marketHistory);
         displaySection("\u2139\uFE0F Marketstack - Informations Ticker", marketTickerInfo.data || marketTickerInfo);
+        displaySection("\uD83C\uDF0E Marketstack - Marchés Boursiers (Exchanges)", marketExchanges.data || marketExchanges);
 
         plotPriceChart(marketHistory.data || marketHistory);
       } catch (error) {
