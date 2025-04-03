@@ -235,7 +235,7 @@ const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.m
           }
           PCFavg = countPCF ? sumPCF / countPCF : null;
         }
- PERcurrent ? (PERavg / PERcurrent) * prixActuel : null;
+ const PERjusteValeur = PERcurrent && PERavg ? (PERavg / PERcurrent) * prixActuel : null;
         const PBRjusteValeur = PBRcurrent ? (PBRavg / PBRcurrent) * prixActuel : null;
         const PSRjusteValeur = PSRcurrent ? (PSRavg / PSRcurrent) * prixActuel : null;
         const PCFjusteValeur = PCFcurrent ? (PCFavg / PCFcurrent) * prixActuel : null;
@@ -269,6 +269,48 @@ const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.m
           </div>`;
 
         plotGaugeChart(potentiel);
+
+        // Graphique comparatif des ratios PER actuel vs PER moyen
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'section';
+        chartContainer.innerHTML = '<h2>📊 Comparatif PER actuel vs historique</h2><canvas id="perCompareChart" width="400" height="200"></canvas>';
+        resultsDiv.appendChild(chartContainer);
+
+        const ctxPER = document.getElementById('perCompareChart').getContext('2d');
+        new Chart(ctxPER, {
+          type: 'bar',
+          data: {
+            labels: ['PER Moyen (5 ans)', 'PER Actuel'],
+            datasets: [{
+              label: 'PER',
+              data: [PERavg || 0, PERcurrent || 0],
+              backgroundColor: ['#3498db', '#2ecc71']
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+
+        // Journal des valeurs utilisées
+        const debugLog = document.createElement('div');
+        debugLog.className = 'section';
+        debugLog.innerHTML = `<h2>🔍 Journal des valeurs utilisées</h2>
+          <pre>${JSON.stringify({
+            netIncomes,
+            totalRevenue,
+            totalCashFlow,
+            totalBookValue,
+            shares,
+            prixActuel,
+            closePrices: closePrices.slice(-5)
+          }, null, 2)}</pre>`;
+        resultsDiv.appendChild(debugLog);
 
       } catch (err) {
         resultsDiv.innerHTML = `<p style="color:red">Erreur : ${err.message}</p>`;
