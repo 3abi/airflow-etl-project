@@ -1,143 +1,206 @@
-Bien sûr ! Voici une version encore plus détaillée et pédagogique, ligne par ligne, pour t’aider à bien comprendre chaque module et chaque endpoint utilisé dans ton script.
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Exploration complète API Boursières</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    input, button {
+      padding: 8px;
+      font-size: 16px;
+    }
+    .section {
+      background: #fff;
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      color: #333;
+    }
+    pre {
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+    canvas {
+      background: #fff;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      margin: 20px 0;
+    }
+    .toggle-btn {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Exploration complète des APIs Marketstack & Yahoo Finance</h1>
+  <label for="symbol">Symbole boursier :</label>
+  <input type="text" id="symbol" placeholder="Ex : AAPL">
+  <button onclick="getAllStockData()">Obtenir les données</button>
 
-📘 Documentation détaillée — Code API Marketstack & Yahoo Finance
-🟨 1. Marketstack — Endpoints API utilisés
-🔹 /eod/latest — ID: eod_latest
-Type : Endpoint de données de marché
+  <canvas id="priceChart" width="800" height="400"></canvas>
+  <canvas id="intradayChart" width="800" height="400"></canvas>
+  <div id="results"></div>
 
-But : Obtenir les dernières valeurs de clôture d’un titre boursier (AAPL, MSFT, etc.)
+  <script>
+    const yahooFinanceApiKey = 'VOTRE_CLE_YAHOO';
+    const marketstackApiKey = 'VOTRE_CLE_MARKETSTACK';
 
-Données retournées :
+    async function fetchYahooFinanceData(symbol) {
+      const modules = [
+        "price","summaryDetail","financialData","defaultKeyStatistics",
+        "calendarEvents","earnings","esgScores","assetProfile",
+        "recommendationTrend","upgradeDowngradeHistory","insiderHolders",
+        "insiderTransactions","majorHoldersBreakdown","incomeStatementHistory",
+        "balanceSheetHistory","cashflowStatementHistory","netSharePurchaseActivity",
+        "sectorTrend","quoteType"
+      ].join(',');
 
-open, high, low, close, volume, date
+      const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=${modules}`;
 
-Utilisation dans le code :
+      const response = await fetch(url, {
+        headers: { 'x-api-key': yahooFinanceApiKey }
+      });
+      if (!response.ok) throw new Error('Erreur Yahoo Finance');
 
-Affichage dans la section “📈 Données EOD actuelles”
+      const json = await response.json();
+      return json.quoteSummary.result[0];
+    }
 
-Montre une photo instantanée de la performance actuelle de l’action
+    async function fetchMarketstackEndpoint(endpoint) {
+      const url = `https://api.marketstack.com/v1${endpoint}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Erreur API Marketstack : ${endpoint} (Code ${res.status})`);
+      return await res.json();
+    }
 
-🔹 /eod — ID: eod_history
-Type : Endpoint historique
+    function displaySection(title, dataObj) {
+      const section = document.createElement('div');
+      section.className = 'section';
+      const h2 = document.createElement('h2');
+      h2.textContent = title;
 
-But : Récupérer les données quotidiennes (EOD) sur une longue période (5 ans ou plus)
+      const toggleBtn = document.createElement('button');
+      toggleBtn.textContent = 'Afficher/Masquer';
+      toggleBtn.className = 'toggle-btn';
 
-Données retournées :
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(dataObj, null, 2);
 
-Identiques à /eod/latest mais en série temporelle
+      toggleBtn.onclick = () => {
+        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+      };
 
-Utilisation dans le code :
+      section.appendChild(h2);
+      section.appendChild(toggleBtn);
+      section.appendChild(pre);
+      document.getElementById('results').appendChild(section);
+    }
 
-Traité et trié pour créer un graphique d’évolution du prix
+    async function getAllStockData() {
+      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+      if (!symbol) return alert("Veuillez saisir un symbole.");
 
-Rendu visuel avec Chart.js
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '<p>Chargement...</p>';
 
-🔹 /tickers/{symbol} — ID: ticker
-Type : Endpoint descriptif
+      try {
+        const yahooData = await fetchYahooFinanceData(symbol);
+        const marketstackData = await fetchMarketstackEndpoint(`/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1200&sort=DESC`);
+        const historicalPrices = marketstackData.data.slice(0, 5).reverse();
 
-But : Récupérer les informations générales sur un titre
+        resultsDiv.innerHTML = '';
 
-Données retournées :
+        const quote = yahooData;
 
-name → nom de l’entreprise
+        const general = {
+          symbole: symbol,
+          nom: quote.price?.longName || "N/A",
+          exchange: quote.price?.exchangeName || "N/A"
+        };
 
-symbol → ticker
+        const fondamentaux = {
+          prixActuel: quote.price?.regularMarketPrice?.raw || "N/A",
+          devise: quote.price?.currency || "N/A",
+          capitalisation: quote.price?.marketCap?.fmt || "N/A",
+          tresorerieParAction: quote.financialData?.totalCashPerShare?.fmt || "N/A",
+          chiffreAffaires: quote.financialData?.totalRevenue?.fmt || "N/A",
+          valeurComptable: quote.defaultKeyStatistics?.bookValue?.fmt || "N/A"
+        };
 
-currency → devise
+        const ratios = {
+          PER: quote.summaryDetail?.trailingPE?.fmt || "N/A",
+          PCF: quote.defaultKeyStatistics?.priceToCashFlow?.fmt || "N/A",
+          PSR: quote.summaryDetail?.priceToSalesTrailing12Months?.fmt || "N/A",
+          PBR: quote.defaultKeyStatistics?.priceToBook?.fmt || "N/A"
+        };
 
-stock_exchange.name, stock_exchange.acronym → marché boursier
+        displaySection('📊 Données Générales - Yahoo', general);
+        displaySection('📊 Données Fondamentales - Yahoo', fondamentaux);
+        displaySection('📊 Ratios Financiers - Yahoo', ratios);
 
-Utilisation dans le code :
+        // Calcul de justes valeurs (moyennes historiques / valeurs actuelles)
+        const earnings = quote.earnings?.earningsChart?.financialsChart?.yearly || [];
+        const prices = historicalPrices.map(p => p.close);
+        const earningsValues = earnings.map(e => e.earnings?.raw);
+        const perList = prices.map((price, i) => earningsValues[i] ? price / earningsValues[i] : null).filter(v => v);
 
-Bloc “📌 Détails lisibles du ticker”
+        const perAvg = perList.length ? perList.reduce((a, b) => a + b, 0) / perList.length : null;
+        const perCurrent = quote.summaryDetail?.trailingPE?.raw || null;
+        const pcfCurrent = quote.defaultKeyStatistics?.priceToCashFlow?.raw || null;
+        const psrCurrent = quote.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
+        const pbrCurrent = quote.defaultKeyStatistics?.priceToBook?.raw || null;
 
-Affichage lisible (et non brut) des infos clés
+        const priceCurrent = quote.price?.regularMarketPrice?.raw || null;
 
-🔹 /exchanges — ID: exchanges
-Type : Endpoint global
+        const fairValues = {
+          PER: (perAvg && perCurrent) ? (perAvg / perCurrent) * priceCurrent : null,
+          PCF: pcfCurrent ? priceCurrent : null,
+          PSR: psrCurrent ? priceCurrent : null,
+          PBR: pbrCurrent ? priceCurrent : null
+        };
 
-But : Récupérer la liste des marchés boursiers disponibles
+        const fairValuesList = Object.values(fairValues).filter(v => typeof v === 'number');
+        const fairAvg = fairValuesList.length ? fairValuesList.reduce((a, b) => a + b, 0) / fairValuesList.length : null;
 
-Données retournées :
+        const upside = fairAvg && priceCurrent ? ((fairAvg / priceCurrent - 1) * 100) : null;
 
-name, acronym, mic, country, etc.
+        const couleur = upside > 0 ? 'green' : 'red';
 
-Utilisation dans le code :
+        displaySection('📐 Juste Valeur Estimée - Ratios Historiques', {
+          'Juste Valeur (PER)': fairValues.PER?.toFixed(2) || 'N/A',
+          'Juste Valeur (PCF)': fairValues.PCF?.toFixed(2) || 'N/A',
+          'Juste Valeur (PSR)': fairValues.PSR?.toFixed(2) || 'N/A',
+          'Juste Valeur (PBR)': fairValues.PBR?.toFixed(2) || 'N/A',
+          'Moyenne': fairAvg?.toFixed(2) || 'N/A',
+          'Potentiel (%)': upside !== null ? `${upside.toFixed(2)}%` : 'N/A'
+        });
 
-Section “🌍 Marchés Boursiers (Exchanges)”
+        const potentiel = document.createElement('div');
+        potentiel.className = 'section';
+        potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
+        resultsDiv.appendChild(potentiel);
 
-Utile pour comprendre où sont listés les titres
-
-🔹 /intraday — ID: intraday
-Type : Endpoint de marché temps réel
-
-But : Fournir les cours en temps quasi-réel par minute
-
-Données retournées :
-
-Données de prix pour chaque minute : date, open, close, etc.
-
-Utilisation dans le code :
-
-Graphique “⏱️ Intraday 1min”
-
-⚠️ Nécessite un plan PRO pour fonctionner
-
-Géré avec grâce si l’API retourne 403 ou 429
-
-🔹 /dividends — ID: dividends
-Type : Endpoint fondamental
-
-But : Lister l’historique des dividendes versés par l’action
-
-Utilisation dans le code :
-
-Bloc “💰 Dividendes”
-
-Permet d’évaluer la politique de retour aux actionnaires
-
-🔹 /splits — ID: splits
-Type : Endpoint fondamental
-
-But : Retourner les fractionnements d’actions (splits) historiques
-
-Utilisation dans le code :
-
-Bloc “🔀 Splits”
-
-Ex : une action devient 2 (2:1 split)
-
-🟦 2. Yahoo Finance — Modules utilisés
-Tous les modules sont récupérés depuis :
-
-bash
-Copier
-Modifier
-GET https://yfapi.net/v11/finance/quoteSummary/{symbol}?modules=...
-Voici une liste des modules demandés avec leur rôle :
-Module	Rôle & Données
-price	Données de base : prix, currency, marketCap
-summaryDetail	PER, dividende, beta, rendement
-financialData	Chiffres financiers clés : revenu, cash, dettes, bookValue
-defaultKeyStatistics	EPS, actions en circulation, ratios
-calendarEvents	Prochaine date de résultats, dividendes
-earnings	Revenus & bénéfices trimestriels/annuels
-esgScores	Données ESG (environnement, social, gouvernance)
-assetProfile	Description de la société, employés, localisation
-recommendationTrend	Achat/Vente/Neutre recommandés par les analystes
-upgradeDowngradeHistory	Historique de recommandations
-insiderHolders	Liste des dirigeants/actionnaires internes
-insiderTransactions	Achats/ventes des insiders
-majorHoldersBreakdown	Répartition actionnaires (institutionnels, public)
-incomeStatementHistory	Compte de résultat historique
-balanceSheetHistory	Bilan comptable
-cashflowStatementHistory	Flux de trésorerie
-netSharePurchaseActivity	Activité nette sur les actions
-sectorTrend	Tendances générales du secteur
-quoteType	Type d’actif : Equity, ETF, Crypto, etc.
-🔐 Sécurité et résilience
-Chaque appel est protégé individuellement (try/catch)
-
-Si un appel échoue → la page continue de fonctionner
-
-Un message d’erreur personnalisé est affiché avec le code (403, 429, etc.)
+      } catch (error) {
+        resultsDiv.innerHTML = '<p style="color:red">Erreur : ' + error.message + '</p>';
+      }
+    }
+  </script>
+</body>
+</html>
