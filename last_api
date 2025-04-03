@@ -173,7 +173,7 @@
         const PSRcurrent = yahooData.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
         const PCFcurrent = yahooData.defaultKeyStatistics?.priceToCashFlow?.raw || null;
 
-        const earnings = yahooData.earnings?.earningsChart?.financialsChart?.yearly || [];
+        const earnings = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(e => e.netIncome?.raw).filter(Boolean) || [];
         const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.totalRevenue?.raw).filter(Boolean) || [];
         const totalCashFlow = yahooData.cashflowStatementHistory?.cashflowStatements?.map(cs => cs.totalCashFromOperatingActivities?.raw).filter(Boolean) || [];
         const totalBookValue = yahooData.balanceSheetHistory?.balanceSheetStatements?.map(bs => bs.totalStockholderEquity?.raw).filter(Boolean) || [];
@@ -184,7 +184,9 @@
         if (earnings.length > 0 && closePrices.length >= earnings.length) {
           let sumPER = 0, countPER = 0;
           for (let i = 0; i < earnings.length; i++) {
-            const eps = earnings[i].earnings?.raw;
+            const netIncome = earnings[i];
+            const shares = yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || null;
+            const eps = (netIncome && shares) ? netIncome / shares : null;
             const price = closePrices[closePrices.length - earnings.length + i];
             if (eps && price) {
               sumPER += price / eps;
