@@ -173,18 +173,16 @@
         const PSRcurrent = yahooData.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
         const PCFcurrent = yahooData.defaultKeyStatistics?.priceToCashFlow?.raw || null;
 
-        // DUPLICATE netIncomes declaration removed
-const shares = yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || null;
+        const netIncomes = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(e => e.netIncome?.raw).filter(v => typeof v === 'number') || [];
+        const shares = yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || null;
 const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.totalRevenue?.raw).filter(v => typeof v === 'number') || [];
         const totalCashFlow = yahooData.cashflowStatementHistory?.cashflowStatements?.map(cs => cs.totalCashFromOperatingActivities?.raw).filter(v => typeof v === 'number') || [];
         const totalBookValue = yahooData.balanceSheetHistory?.balanceSheetStatements?.map(bs => bs.totalStockholderEquity?.raw).filter(v => typeof v === 'number') || [];
         // const totalMarketCap = yahooData.price?.marketCap?.raw || prixActuel * yahooData.defaultKeyStatistics?.sharesOutstanding?.raw;
-        const netIncomes = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.netIncome?.raw).filter(Boolean) || [];
-
+        
         let PERavg = null;
-        if (netIncomes.length > 0 && closePrices.length >= netIncomes.length && yahooData.defaultKeyStatistics?.sharesOutstanding?.raw) {
+        if (netIncomes.length > 0 && closePrices.length >= netIncomes.length && shares) {
           let sumPER = 0, countPER = 0;
-          const shares = yahooData.defaultKeyStatistics.sharesOutstanding.raw;
           for (let i = 0; i < netIncomes.length; i++) {
             const eps = netIncomes[i] / shares;
             const price = closePrices[closePrices.length - netIncomes.length + i];
@@ -195,8 +193,6 @@ const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.m
           }
           PERavg = countPER ? sumPER / countPER : null;
         }
-        }
-
         let PBRavg = null;
         if (totalBookValue.length > 0 && shares && closePrices.length >= totalBookValue.length) {
           let sumPBR = 0, countPBR = 0;
@@ -211,8 +207,6 @@ const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.m
           }
           PBRavg = countPBR ? sumPBR / countPBR : null;
         }
-        }
-
         let PSRavg = null;
         if (totalRevenue.length > 0 && shares && closePrices.length >= totalRevenue.length) {
           let sumPSR = 0, countPSR = 0;
@@ -227,8 +221,6 @@ const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.m
           }
           PSRavg = countPSR ? sumPSR / countPSR : null;
         }
-        }
-
         let PCFavg = null;
         if (totalCashFlow.length > 0 && shares && closePrices.length >= totalCashFlow.length) {
           let sumPCF = 0, countPCF = 0;
@@ -243,9 +235,7 @@ const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.m
           }
           PCFavg = countPCF ? sumPCF / countPCF : null;
         }
-        }
-
-        const PERjusteValeur = PERcurrent ? (PERavg / PERcurrent) * prixActuel : null;
+ PERcurrent ? (PERavg / PERcurrent) * prixActuel : null;
         const PBRjusteValeur = PBRcurrent ? (PBRavg / PBRcurrent) * prixActuel : null;
         const PSRjusteValeur = PSRcurrent ? (PSRavg / PSRcurrent) * prixActuel : null;
         const PCFjusteValeur = PCFcurrent ? (PCFavg / PCFcurrent) * prixActuel : null;
