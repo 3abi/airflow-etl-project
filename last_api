@@ -53,52 +53,71 @@
   <label for="symbol">Symbole boursier :</label>
   <input type="text" id="symbol" placeholder="Ex : AAPL">
   <button onclick="getAllStockData()">Obtenir les données</button>
-  <button onclick="afficherGraphiqueHistorique()">Graphique Historique (5 ans)</button>
 
   <canvas id="priceChart" width="800" height="400"></canvas>
-  <canvas id="historiqueChart" width="900" height="400"></canvas>
   <div id="results"></div>
 
   <script>
-    async function afficherGraphiqueHistorique() {
+    const yahooFinanceApiKey = '';
+    const marketstackApiKey = '';
+
+    async function fetchYahooChart(symbol) {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1mo&range=5y`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Erreur Yahoo Chart');
+      return await response.json();
+    }
+
+    function plotPriceChart(timestamps, prices, symbol) {
+      const ctx = document.getElementById('priceChart').getContext('2d');
+      if (window.priceChartInstance) window.priceChartInstance.destroy();
+
+      window.priceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: timestamps.map(t => new Date(t * 1000).toLocaleDateString()),
+          datasets: [{
+            label: `Cours de l'action ${symbol} (5 ans)` ,
+            data: prices,
+            borderColor: 'blue',
+            backgroundColor: 'lightblue',
+            fill: false,
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: { display: true, text: 'Date' }
+            },
+            y: {
+              title: { display: true, text: 'Prix de clôture' }
+            }
+          }
+        }
+      });
+    }
+
+    async function getAllStockData() {
       const symbol = document.getElementById('symbol').value.trim().toUpperCase();
       if (!symbol) return alert("Veuillez saisir un symbole.");
 
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '<p>Chargement...</p>';
+
       try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1mo&range=5y`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Erreur lors de la récupération des données de Yahoo Finance");
+        const yahooChartData = await fetchYahooChart(symbol);
+        const chartData = yahooChartData.chart.result[0];
+        const timestamps = chartData.timestamp;
+        const closePrices = chartData.indicators.quote[0].close;
+        plotPriceChart(timestamps, closePrices, symbol);
 
-        const json = await response.json();
-        const data = json.chart.result[0];
-        const timestamps = data.timestamp.map(t => new Date(t * 1000).toLocaleDateString());
-        const closePrices = data.indicators.quote[0].close;
+        // Le reste de ton code existant peut suivre ici
+        resultsDiv.innerHTML += '<p>✅ Graphique historique chargé avec succès.</p>';
 
-        const ctx = document.getElementById('historiqueChart').getContext('2d');
-        if (window.historiqueChartInstance) window.historiqueChartInstance.destroy();
-
-        window.historiqueChartInstance = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: timestamps,
-            datasets: [{
-              label: `Cours de l'action ${symbol} sur 5 ans`,
-              data: closePrices,
-              borderColor: 'blue',
-              fill: false,
-              tension: 0.1
-            }]
-          },
-          options: {
-            responsive: true,
-            scales: {
-              x: { title: { display: true, text: 'Date' } },
-              y: { title: { display: true, text: 'Prix de clôture' } }
-            }
-          }
-        });
-      } catch (err) {
-        alert("Erreur lors du chargement des données : " + err.message);
+      } catch (error) {
+        resultsDiv.innerHTML = '<p style="color:red">Erreur : ' + error.message + '</p>';
       }
     }
   </script>
