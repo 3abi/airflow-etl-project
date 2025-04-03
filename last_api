@@ -113,20 +113,20 @@
       });
     }
 
-    function plotGaugeChart(potential) {
+    function plotGaugeChart(potentiel) {
       const ctx = document.getElementById('gaugeChart').getContext('2d');
       if (window.gaugeChartInstance) window.gaugeChartInstance.destroy();
 
-      const value = Math.min(Math.max(potential, -100), 100);
-      const color = value >= 0 ? '#2ecc71' : '#e74c3c';
+      const valeur = Math.min(Math.max(potentiel, -100), 100);
+      const couleur = valeur >= 0 ? '#2ecc71' : '#e74c3c';
 
       window.gaugeChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
           labels: ['Potentiel', ''],
           datasets: [{
-            data: [Math.abs(value), 100 - Math.abs(value)],
-            backgroundColor: [color, '#ddd'],
+            data: [Math.abs(valeur), 100 - Math.abs(valeur)],
+            backgroundColor: [couleur, '#ddd'],
             borderWidth: 0,
             rotation: -90,
             circumference: 180,
@@ -139,7 +139,7 @@
             legend: { display: false },
             datalabels: {
               display: true,
-              formatter: () => `${value.toFixed(1)}%`,
+              formatter: () => `${valeur.toFixed(1)}%`,
               color: '#333',
               font: { size: 18, weight: 'bold' }
             }
@@ -167,45 +167,50 @@
         const closePrices = chartData.indicators.quote[0].close;
         plotPriceChart(timestamps, closePrices, symbol);
 
-        const currentPrice = yahooData.price?.regularMarketPrice?.raw || 0;
-        const trailingPE = yahooData.summaryDetail?.trailingPE?.raw || null;
-        const priceToBook = yahooData.defaultKeyStatistics?.priceToBook?.raw || null;
-        const priceToSales = yahooData.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
-        const priceToCashFlow = yahooData.defaultKeyStatistics?.priceToCashFlow?.raw || null;
+        const prixActuel = yahooData.price?.regularMarketPrice?.raw || 0;
+        const PERcurrent = yahooData.summaryDetail?.trailingPE?.raw || null;
+        const PBRcurrent = yahooData.defaultKeyStatistics?.priceToBook?.raw || null;
+        const PSRcurrent = yahooData.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
+        const PCFcurrent = yahooData.defaultKeyStatistics?.priceToCashFlow?.raw || null;
 
-        const fairValuePER = trailingPE ? (20 / trailingPE) * currentPrice : null;
-        const fairValuePBR = priceToBook ? (3 / priceToBook) * currentPrice : null;
-        const fairValuePSR = priceToSales ? (6 / priceToSales) * currentPrice : null;
-        const fairValuePCF = priceToCashFlow ? (15 / priceToCashFlow) * currentPrice : null;
+        const PERavg = 20;
+        const PBRavg = 3;
+        const PSRavg = 6;
+        const PCFavg = 15;
 
-        const fairValues = [fairValuePER, fairValuePBR, fairValuePSR, fairValuePCF].filter(v => typeof v === 'number');
-        const fairValueAvg = fairValues.length ? fairValues.reduce((a,b) => a+b, 0) / fairValues.length : null;
-        const potential = fairValueAvg ? ((fairValueAvg - currentPrice) / currentPrice) * 100 : 0;
+        const PERjusteValeur = PERcurrent ? (PERavg / PERcurrent) * prixActuel : null;
+        const PBRjusteValeur = PBRcurrent ? (PBRavg / PBRcurrent) * prixActuel : null;
+        const PSRjusteValeur = PSRcurrent ? (PSRavg / PSRcurrent) * prixActuel : null;
+        const PCFjusteValeur = PCFcurrent ? (PCFavg / PCFcurrent) * prixActuel : null;
+
+        const justesValeurs = [PERjusteValeur, PBRjusteValeur, PSRjusteValeur, PCFjusteValeur].filter(v => typeof v === 'number');
+        const justeValeurMoyenne = justesValeurs.length ? justesValeurs.reduce((a,b) => a+b, 0) / justesValeurs.length : null;
+        const potentiel = justeValeurMoyenne ? ((justeValeurMoyenne - prixActuel) / prixActuel) * 100 : 0;
 
         resultsDiv.innerHTML = `
           <div class="section">
             <h2>Données Fondamentales (Yahoo)</h2>
             <pre>${JSON.stringify({
-              prixActuel: currentPrice,
-              PER: trailingPE,
-              PBR: priceToBook,
-              PSR: priceToSales,
-              PCF: priceToCashFlow
+              prixActuel: prixActuel,
+              PER: PERcurrent,
+              PBR: PBRcurrent,
+              PSR: PSRcurrent,
+              PCF: PCFcurrent
             }, null, 2)}</pre>
           </div>
           <div class="section">
             <h2>📐 Justes Valeurs estimées</h2>
             <pre>${JSON.stringify({
-              'Juste valeur PER': fairValuePER?.toFixed(2),
-              'Juste valeur PBR': fairValuePBR?.toFixed(2),
-              'Juste valeur PSR': fairValuePSR?.toFixed(2),
-              'Juste valeur PCF': fairValuePCF?.toFixed(2),
-              'Moyenne': fairValueAvg?.toFixed(2),
-              'Potentiel': potential.toFixed(2) + '%'
+              'Juste valeur PER': PERjusteValeur?.toFixed(2),
+              'Juste valeur PBR': PBRjusteValeur?.toFixed(2),
+              'Juste valeur PSR': PSRjusteValeur?.toFixed(2),
+              'Juste valeur PCF': PCFjusteValeur?.toFixed(2),
+              'Moyenne': justeValeurMoyenne?.toFixed(2),
+              'Potentiel': potentiel.toFixed(2) + '%'
             }, null, 2)}</pre>
           </div>`;
 
-        plotGaugeChart(potential);
+        plotGaugeChart(potentiel);
 
       } catch (err) {
         resultsDiv.innerHTML = `<p style="color:red">Erreur : ${err.message}</p>`;
