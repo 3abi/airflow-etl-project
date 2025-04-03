@@ -173,27 +173,27 @@
         const PSRcurrent = yahooData.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
         const PCFcurrent = yahooData.defaultKeyStatistics?.priceToCashFlow?.raw || null;
 
-        const earnings = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(e => e.netIncome?.raw).filter(Boolean) || [];
-        const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.totalRevenue?.raw).filter(Boolean) || [];
-        const totalCashFlow = yahooData.cashflowStatementHistory?.cashflowStatements?.map(cs => cs.totalCashFromOperatingActivities?.raw).filter(Boolean) || [];
-        const totalBookValue = yahooData.balanceSheetHistory?.balanceSheetStatements?.map(bs => bs.totalStockholderEquity?.raw).filter(Boolean) || [];
+        const netIncomes = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(e => e.netIncome?.raw).filter(v => typeof v === 'number') || [];
+        const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.totalRevenue?.raw).filter(v => typeof v === 'number') || [];
+        const totalCashFlow = yahooData.cashflowStatementHistory?.cashflowStatements?.map(cs => cs.totalCashFromOperatingActivities?.raw).filter(v => typeof v === 'number') || [];
+        const totalBookValue = yahooData.balanceSheetHistory?.balanceSheetStatements?.map(bs => bs.totalStockholderEquity?.raw).filter(v => typeof v === 'number') || [];
         const totalMarketCap = yahooData.price?.marketCap?.raw || prixActuel * yahooData.defaultKeyStatistics?.sharesOutstanding?.raw;
         const netIncomes = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.netIncome?.raw).filter(Boolean) || [];
 
         let PERavg = null;
-        if (earnings.length > 0 && closePrices.length >= earnings.length) {
+        if (netIncomes.length > 0 && closePrices.length >= netIncomes.length && yahooData.defaultKeyStatistics?.sharesOutstanding?.raw) {
           let sumPER = 0, countPER = 0;
-          for (let i = 0; i < earnings.length; i++) {
-            const netIncome = earnings[i];
-            const shares = yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || null;
-            const eps = (netIncome && shares) ? netIncome / shares : null;
-            const price = closePrices[closePrices.length - earnings.length + i];
+          const shares = yahooData.defaultKeyStatistics.sharesOutstanding.raw;
+          for (let i = 0; i < netIncomes.length; i++) {
+            const eps = netIncomes[i] / shares;
+            const price = closePrices[closePrices.length - netIncomes.length + i];
             if (eps && price) {
               sumPER += price / eps;
               countPER++;
             }
           }
           PERavg = countPER ? sumPER / countPER : null;
+        }
         }
 
         let PBRavg = null;
