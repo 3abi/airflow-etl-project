@@ -173,11 +173,12 @@
         const PSRcurrent = yahooData.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
         const PCFcurrent = yahooData.defaultKeyStatistics?.priceToCashFlow?.raw || null;
 
-        const netIncomes = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(e => e.netIncome?.raw).filter(v => typeof v === 'number') || [];
-        const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.totalRevenue?.raw).filter(v => typeof v === 'number') || [];
+        // DUPLICATE netIncomes declaration removed
+const shares = yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || null;
+const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.totalRevenue?.raw).filter(v => typeof v === 'number') || [];
         const totalCashFlow = yahooData.cashflowStatementHistory?.cashflowStatements?.map(cs => cs.totalCashFromOperatingActivities?.raw).filter(v => typeof v === 'number') || [];
         const totalBookValue = yahooData.balanceSheetHistory?.balanceSheetStatements?.map(bs => bs.totalStockholderEquity?.raw).filter(v => typeof v === 'number') || [];
-        const totalMarketCap = yahooData.price?.marketCap?.raw || prixActuel * yahooData.defaultKeyStatistics?.sharesOutstanding?.raw;
+        // const totalMarketCap = yahooData.price?.marketCap?.raw || prixActuel * yahooData.defaultKeyStatistics?.sharesOutstanding?.raw;
         const netIncomes = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.netIncome?.raw).filter(Boolean) || [];
 
         let PERavg = null;
@@ -197,29 +198,28 @@
         }
 
         let PBRavg = null;
-        if (totalBookValue.length > 0 && closePrices.length >= totalBookValue.length) {
+        if (totalBookValue.length > 0 && shares && closePrices.length >= totalBookValue.length) {
           let sumPBR = 0, countPBR = 0;
           for (let i = 0; i < totalBookValue.length; i++) {
             const bv = totalBookValue[i];
             const price = closePrices[closePrices.length - totalBookValue.length + i];
-            if (bv && yahooData.defaultKeyStatistics?.sharesOutstanding?.raw) {
-              if (!yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || yahooData.defaultKeyStatistics.sharesOutstanding.raw === 0) continue;
-              const bvps = bv / yahooData.defaultKeyStatistics.sharesOutstanding.raw;
+            const bvps = bv / shares;
+            if (bvps && price) {
               sumPBR += price / bvps;
               countPBR++;
             }
           }
           PBRavg = countPBR ? sumPBR / countPBR : null;
         }
+        }
 
         let PSRavg = null;
-        if (totalRevenue.length > 0 && yahooData.defaultKeyStatistics?.sharesOutstanding?.raw) {
+        if (totalRevenue.length > 0 && shares && closePrices.length >= totalRevenue.length) {
           let sumPSR = 0, countPSR = 0;
           for (let i = 0; i < totalRevenue.length; i++) {
             const revenue = totalRevenue[i];
             const price = closePrices[closePrices.length - totalRevenue.length + i];
-            if (!yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || yahooData.defaultKeyStatistics.sharesOutstanding.raw === 0) continue;
-            const revenuePerShare = revenue / yahooData.defaultKeyStatistics.sharesOutstanding.raw;
+            const revenuePerShare = revenue / shares;
             if (revenuePerShare && price) {
               sumPSR += price / revenuePerShare;
               countPSR++;
@@ -227,21 +227,22 @@
           }
           PSRavg = countPSR ? sumPSR / countPSR : null;
         }
+        }
 
         let PCFavg = null;
-        if (totalCashFlow.length > 0 && yahooData.defaultKeyStatistics?.sharesOutstanding?.raw) {
+        if (totalCashFlow.length > 0 && shares && closePrices.length >= totalCashFlow.length) {
           let sumPCF = 0, countPCF = 0;
           for (let i = 0; i < totalCashFlow.length; i++) {
             const cashflow = totalCashFlow[i];
             const price = closePrices[closePrices.length - totalCashFlow.length + i];
-            if (!yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || yahooData.defaultKeyStatistics.sharesOutstanding.raw === 0) continue;
-            const cfpershare = cashflow / yahooData.defaultKeyStatistics.sharesOutstanding.raw;
+            const cfpershare = cashflow / shares;
             if (cfpershare && price) {
               sumPCF += price / cfpershare;
               countPCF++;
             }
           }
           PCFavg = countPCF ? sumPCF / countPCF : null;
+        }
         }
 
         const PERjusteValeur = PERcurrent ? (PERavg / PERcurrent) * prixActuel : null;
