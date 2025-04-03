@@ -173,11 +173,11 @@
         const PSRcurrent = yahooData.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
         const PCFcurrent = yahooData.defaultKeyStatistics?.priceToCashFlow?.raw || null;
 
-        const netIncomes = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(e => e.netIncome?.raw).filter(v => typeof v === 'number') || [];
+        const netIncomes = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(e => e.netIncome?.raw).filter(v => typeof v === 'number' && !isNaN(v)) || [];
         const shares = yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || null;
-const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.totalRevenue?.raw).filter(v => typeof v === 'number') || [];
-        const totalCashFlow = yahooData.cashflowStatementHistory?.cashflowStatements?.map(cs => cs.totalCashFromOperatingActivities?.raw).filter(v => typeof v === 'number') || [];
-        const totalBookValue = yahooData.balanceSheetHistory?.balanceSheetStatements?.map(bs => bs.totalStockholderEquity?.raw).filter(v => typeof v === 'number') || [];
+const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.totalRevenue?.raw).filter(v => typeof v === 'number' && !isNaN(v)) || [];
+        const totalCashFlow = yahooData.cashflowStatementHistory?.cashflowStatements?.map(cs => cs.totalCashFromOperatingActivities?.raw).filter(v => typeof v === 'number' && !isNaN(v)) || [];
+        const totalBookValue = yahooData.balanceSheetHistory?.balanceSheetStatements?.map(bs => bs.totalStockholderEquity?.raw).filter(v => typeof v === 'number' && !isNaN(v)) || [];
         // const totalMarketCap = yahooData.price?.marketCap?.raw || prixActuel * yahooData.defaultKeyStatistics?.sharesOutstanding?.raw;
         
         let PERavg = null;
