@@ -173,10 +173,74 @@
         const PSRcurrent = yahooData.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
         const PCFcurrent = yahooData.defaultKeyStatistics?.priceToCashFlow?.raw || null;
 
-        const PERavg = 20;
-        const PBRavg = 3;
-        const PSRavg = 6;
-        const PCFavg = 15;
+        const earnings = yahooData.earnings?.earningsChart?.financialsChart?.yearly || [];
+        const totalRevenue = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.totalRevenue?.raw).filter(Boolean) || [];
+        const totalCashFlow = yahooData.cashflowStatementHistory?.cashflowStatements?.map(cs => cs.totalCashFromOperatingActivities?.raw).filter(Boolean) || [];
+        const totalBookValue = yahooData.balanceSheetHistory?.balanceSheetStatements?.map(bs => bs.totalStockholderEquity?.raw).filter(Boolean) || [];
+        const totalMarketCap = yahooData.price?.marketCap?.raw || prixActuel * yahooData.defaultKeyStatistics?.sharesOutstanding?.raw;
+        const netIncomes = yahooData.incomeStatementHistory?.incomeStatementHistory?.map(i => i.netIncome?.raw).filter(Boolean) || [];
+
+        let PERavg = null;
+        if (earnings.length > 0 && closePrices.length >= earnings.length) {
+          let sumPER = 0, countPER = 0;
+          for (let i = 0; i < earnings.length; i++) {
+            const eps = earnings[i].earnings?.raw;
+            const price = closePrices[closePrices.length - earnings.length + i];
+            if (eps && price) {
+              sumPER += price / eps;
+              countPER++;
+            }
+          }
+          PERavg = countPER ? sumPER / countPER : null;
+        }
+
+        let PBRavg = null;
+        if (totalBookValue.length > 0 && closePrices.length >= totalBookValue.length) {
+          let sumPBR = 0, countPBR = 0;
+          for (let i = 0; i < totalBookValue.length; i++) {
+            const bv = totalBookValue[i];
+            const price = closePrices[closePrices.length - totalBookValue.length + i];
+            if (bv && yahooData.defaultKeyStatistics?.sharesOutstanding?.raw) {
+              if (!yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || yahooData.defaultKeyStatistics.sharesOutstanding.raw === 0) continue;
+              const bvps = bv / yahooData.defaultKeyStatistics.sharesOutstanding.raw;
+              sumPBR += price / bvps;
+              countPBR++;
+            }
+          }
+          PBRavg = countPBR ? sumPBR / countPBR : null;
+        }
+
+        let PSRavg = null;
+        if (totalRevenue.length > 0 && yahooData.defaultKeyStatistics?.sharesOutstanding?.raw) {
+          let sumPSR = 0, countPSR = 0;
+          for (let i = 0; i < totalRevenue.length; i++) {
+            const revenue = totalRevenue[i];
+            const price = closePrices[closePrices.length - totalRevenue.length + i];
+            if (!yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || yahooData.defaultKeyStatistics.sharesOutstanding.raw === 0) continue;
+            const revenuePerShare = revenue / yahooData.defaultKeyStatistics.sharesOutstanding.raw;
+            if (revenuePerShare && price) {
+              sumPSR += price / revenuePerShare;
+              countPSR++;
+            }
+          }
+          PSRavg = countPSR ? sumPSR / countPSR : null;
+        }
+
+        let PCFavg = null;
+        if (totalCashFlow.length > 0 && yahooData.defaultKeyStatistics?.sharesOutstanding?.raw) {
+          let sumPCF = 0, countPCF = 0;
+          for (let i = 0; i < totalCashFlow.length; i++) {
+            const cashflow = totalCashFlow[i];
+            const price = closePrices[closePrices.length - totalCashFlow.length + i];
+            if (!yahooData.defaultKeyStatistics?.sharesOutstanding?.raw || yahooData.defaultKeyStatistics.sharesOutstanding.raw === 0) continue;
+            const cfpershare = cashflow / yahooData.defaultKeyStatistics.sharesOutstanding.raw;
+            if (cfpershare && price) {
+              sumPCF += price / cfpershare;
+              countPCF++;
+            }
+          }
+          PCFavg = countPCF ? sumPCF / countPCF : null;
+        }
 
         const PERjusteValeur = PERcurrent ? (PERavg / PERcurrent) * prixActuel : null;
         const PBRjusteValeur = PBRcurrent ? (PBRavg / PBRcurrent) * prixActuel : null;
@@ -190,24 +254,25 @@
         resultsDiv.innerHTML = `
           <div class="section">
             <h2>Données Fondamentales (Yahoo)</h2>
-            <pre>${JSON.stringify({
-              prixActuel: prixActuel,
-              PER: PERcurrent,
-              PBR: PBRcurrent,
-              PSR: PSRcurrent,
-              PCF: PCFcurrent
-            }, null, 2)}</pre>
+            <table>
+              <tr><th>Ratio</th><th>Actuel</th><th>Moyenne (5 ans)</th></tr>
+              <tr><td>PER</td><td>${PERcurrent?.toFixed(2) || 'N/A'}</td><td>${PERavg?.toFixed(2) || 'N/A'}</td></tr>
+              <tr><td>PBR</td><td>${PBRcurrent?.toFixed(2) || 'N/A'}</td><td>${PBRavg?.toFixed(2) || 'N/A'}</td></tr>
+              <tr><td>PSR</td><td>${PSRcurrent?.toFixed(2) || 'N/A'}</td><td>${PSRavg?.toFixed(2) || 'N/A'}</td></tr>
+              <tr><td>PCF</td><td>${PCFcurrent?.toFixed(2) || 'N/A'}</td><td>${PCFavg?.toFixed(2) || 'N/A'}</td></tr>
+            </table>
           </div>
           <div class="section">
             <h2>📐 Justes Valeurs estimées</h2>
-            <pre>${JSON.stringify({
-              'Juste valeur PER': PERjusteValeur?.toFixed(2),
-              'Juste valeur PBR': PBRjusteValeur?.toFixed(2),
-              'Juste valeur PSR': PSRjusteValeur?.toFixed(2),
-              'Juste valeur PCF': PCFjusteValeur?.toFixed(2),
-              'Moyenne': justeValeurMoyenne?.toFixed(2),
-              'Potentiel': potentiel.toFixed(2) + '%'
-            }, null, 2)}</pre>
+            <table>
+              <tr><th>Méthode</th><th>Juste Valeur</th></tr>
+              <tr><td>PER</td><td>${PERjusteValeur?.toFixed(2) || 'N/A'}</td></tr>
+              <tr><td>PBR</td><td>${PBRjusteValeur?.toFixed(2) || 'N/A'}</td></tr>
+              <tr><td>PSR</td><td>${PSRjusteValeur?.toFixed(2) || 'N/A'}</td></tr>
+              <tr><td>PCF</td><td>${PCFjusteValeur?.toFixed(2) || 'N/A'}</td></tr>
+              <tr><td>Moyenne</td><td>${justeValeurMoyenne?.toFixed(2) || 'N/A'}</td></tr>
+              <tr><td>Potentiel</td><td>${potentiel.toFixed(2)}%</td></tr>
+            </table>
           </div>`;
 
         plotGaugeChart(potentiel);
