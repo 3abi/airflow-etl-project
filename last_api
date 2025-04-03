@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Exploration complète API Boursières</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -55,61 +56,93 @@
   <button onclick="getAllStockData()">Obtenir les données</button>
 
   <canvas id="priceChart" width="800" height="400"></canvas>
+  <canvas id="gaugeChart" width="500" height="250"></canvas>
   <div id="results"></div>
 
   <script>
-    const yahooFinanceApiKey = '';
-    const marketstackApiKey = '';
+    const yahooFinanceApiKey = 'TA_CLE_ICI';
 
-    async function fetchYahooFinanceData(symbol) {
-      const modules = [
-        "price","summaryDetail","financialData","defaultKeyStatistics",
-        "calendarEvents","earnings","esgScores","assetProfile",
-        "recommendationTrend","upgradeDowngradeHistory","insiderHolders",
-        "insiderTransactions","majorHoldersBreakdown","incomeStatementHistory",
-        "balanceSheetHistory","cashflowStatementHistory","netSharePurchaseActivity",
-        "sectorTrend","quoteType"
-      ].join(',');
-
+    async function fetchYahooData(symbol) {
+      const modules = ["price","summaryDetail","financialData","defaultKeyStatistics","earnings"].join(',');
       const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=${modules}`;
-
-      const response = await fetch(url, {
-        headers: { 'x-api-key': yahooFinanceApiKey }
-      });
-      if (!response.ok) throw new Error('Erreur Yahoo Finance');
-
-      const json = await response.json();
+      const res = await fetch(url, { headers: { 'x-api-key': yahooFinanceApiKey } });
+      if (!res.ok) throw new Error("Erreur lors de l'appel à Yahoo Finance API");
+      const json = await res.json();
       return json.quoteSummary.result[0];
     }
 
-    async function fetchMarketstackEndpoint(endpoint) {
-      const url = `https://api.marketstack.com/v1${endpoint}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Erreur API Marketstack : ${endpoint} (Code ${res.status})`);
-      return await res.json();
+    async function fetchYahooChart(symbol) {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1mo&range=5y`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Erreur Yahoo Chart');
+      return await response.json();
     }
 
-    function displaySection(title, dataObj) {
-      const section = document.createElement('div');
-      section.className = 'section';
-      const h2 = document.createElement('h2');
-      h2.textContent = title;
+    function plotPriceChart(timestamps, prices, symbol) {
+      const ctx = document.getElementById('priceChart').getContext('2d');
+      if (window.priceChartInstance) window.priceChartInstance.destroy();
 
-      const toggleBtn = document.createElement('button');
-      toggleBtn.textContent = 'Afficher/Masquer';
-      toggleBtn.className = 'toggle-btn';
+      window.priceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: timestamps.map(t => new Date(t * 1000).toLocaleDateString()),
+          datasets: [{
+            label: `Cours de l'action ${symbol} (5 ans)` ,
+            data: prices,
+            borderColor: 'blue',
+            backgroundColor: 'lightblue',
+            fill: false,
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: { display: true, text: 'Date' }
+            },
+            y: {
+              title: { display: true, text: 'Prix de clôture' }
+            }
+          }
+        }
+      });
+    }
 
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(dataObj, null, 2);
+    function plotGaugeChart(potential) {
+      const ctx = document.getElementById('gaugeChart').getContext('2d');
+      if (window.gaugeChartInstance) window.gaugeChartInstance.destroy();
 
-      toggleBtn.onclick = () => {
-        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
-      };
+      const value = Math.min(Math.max(potential, -100), 100);
+      const color = value >= 0 ? '#2ecc71' : '#e74c3c';
 
-      section.appendChild(h2);
-      section.appendChild(toggleBtn);
-      section.appendChild(pre);
-      document.getElementById('results').appendChild(section);
+      window.gaugeChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Potentiel', ''],
+          datasets: [{
+            data: [Math.abs(value), 100 - Math.abs(value)],
+            backgroundColor: [color, '#ddd'],
+            borderWidth: 0,
+            rotation: -90,
+            circumference: 180,
+            cutout: '70%'
+          }]
+        },
+        options: {
+          plugins: {
+            tooltip: { enabled: false },
+            legend: { display: false },
+            datalabels: {
+              display: true,
+              formatter: () => `${value.toFixed(1)}%`,
+              color: '#333',
+              font: { size: 18, weight: 'bold' }
+            }
+          }
+        },
+        plugins: [ChartDataLabels]
+      });
     }
 
     async function getAllStockData() {
@@ -120,88 +153,58 @@
       resultsDiv.innerHTML = '<p>Chargement...</p>';
 
       try {
-        const yahooData = await fetchYahooFinanceData(symbol);
-        const marketstackData = await fetchMarketstackEndpoint(`/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1200&sort=DESC`);
-        const historicalPrices = marketstackData.data.slice(0, 5).reverse();
+        const [chartDataRaw, yahooData] = await Promise.all([
+          fetchYahooChart(symbol),
+          fetchYahooData(symbol)
+        ]);
 
-        resultsDiv.innerHTML = '';
+        const chartData = chartDataRaw.chart.result[0];
+        const timestamps = chartData.timestamp;
+        const closePrices = chartData.indicators.quote[0].close;
+        plotPriceChart(timestamps, closePrices, symbol);
 
-        const quote = yahooData;
+        const currentPrice = yahooData.price?.regularMarketPrice?.raw || 0;
+        const trailingPE = yahooData.summaryDetail?.trailingPE?.raw || null;
+        const priceToBook = yahooData.defaultKeyStatistics?.priceToBook?.raw || null;
+        const priceToSales = yahooData.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
+        const priceToCashFlow = yahooData.defaultKeyStatistics?.priceToCashFlow?.raw || null;
 
-        const general = {
-          symbole: symbol,
-          nom: quote.price?.longName || "N/A",
-          exchange: quote.price?.exchangeName || "N/A"
-        };
+        const fairValuePER = trailingPE ? (20 / trailingPE) * currentPrice : null;
+        const fairValuePBR = priceToBook ? (3 / priceToBook) * currentPrice : null;
+        const fairValuePSR = priceToSales ? (6 / priceToSales) * currentPrice : null;
+        const fairValuePCF = priceToCashFlow ? (15 / priceToCashFlow) * currentPrice : null;
 
-        const fondamentaux = {
-          prixActuel: quote.price?.regularMarketPrice?.raw || "N/A",
-          devise: quote.price?.currency || "N/A",
-          capitalisation: quote.price?.marketCap?.fmt || "N/A",
-          tresorerieParAction: quote.financialData?.totalCashPerShare?.fmt || "N/A",
-          chiffreAffaires: quote.financialData?.totalRevenue?.fmt || "N/A",
-          valeurComptable: quote.defaultKeyStatistics?.bookValue?.fmt || "N/A"
-        };
+        const fairValues = [fairValuePER, fairValuePBR, fairValuePSR, fairValuePCF].filter(v => typeof v === 'number');
+        const fairValueAvg = fairValues.length ? fairValues.reduce((a,b) => a+b, 0) / fairValues.length : null;
+        const potential = fairValueAvg ? ((fairValueAvg - currentPrice) / currentPrice) * 100 : 0;
 
-        const ratios = {
-          PER: quote.summaryDetail?.trailingPE?.fmt || "N/A",
-          PCF: quote.defaultKeyStatistics?.priceToCashFlow?.fmt || "N/A",
-          PSR: quote.summaryDetail?.priceToSalesTrailing12Months?.fmt || "N/A",
-          PBR: quote.defaultKeyStatistics?.priceToBook?.fmt || "N/A"
-        };
+        resultsDiv.innerHTML = `
+          <div class="section">
+            <h2>Données Fondamentales (Yahoo)</h2>
+            <pre>${JSON.stringify({
+              prixActuel: currentPrice,
+              PER: trailingPE,
+              PBR: priceToBook,
+              PSR: priceToSales,
+              PCF: priceToCashFlow
+            }, null, 2)}</pre>
+          </div>
+          <div class="section">
+            <h2>📐 Justes Valeurs estimées</h2>
+            <pre>${JSON.stringify({
+              'Juste valeur PER': fairValuePER?.toFixed(2),
+              'Juste valeur PBR': fairValuePBR?.toFixed(2),
+              'Juste valeur PSR': fairValuePSR?.toFixed(2),
+              'Juste valeur PCF': fairValuePCF?.toFixed(2),
+              'Moyenne': fairValueAvg?.toFixed(2),
+              'Potentiel': potential.toFixed(2) + '%'
+            }, null, 2)}</pre>
+          </div>`;
 
-        displaySection('📊 Données Générales', general);
-        displaySection('📊 Données Fondamentales', fondamentaux);
-        displaySection('📊 Ratios Financiers { Actuels }', ratios);
+        plotGaugeChart(potential);
 
-        // Calcul de justes valeurs (moyennes historiques / valeurs actuelles)
-        const earnings = quote.earnings?.earningsChart?.financialsChart?.yearly || [];
-        const prices = historicalPrices.map(p => p.close);
-        const earningsValues = earnings.map(e => e.earnings?.raw);
-        const perList = prices.map((price, i) => earningsValues[i] ? price / earningsValues[i] : null).filter(v => v);
-        const pbrList = prices.map((price, i) => earningsValues[i] ? price / earningsValues[i] : null).filter(v => v);
-
-
-        const perAvg = perList.length ? perList.reduce((a, b) => a + b, 0) / perList.length : null;
-        const pbrAvg = pbrList.length ? pbrList.reduce((a, b) => a + b, 0) / pbrList.length : null;
-        const perCurrent = quote.summaryDetail?.trailingPE?.raw || null;
-        const pcfCurrent = quote.defaultKeyStatistics?.priceToCashFlow?.raw || null;
-        const psrCurrent = quote.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
-        const pbrCurrent = quote.defaultKeyStatistics?.priceToBook?.raw || null;
-
-        const priceCurrent = quote.price?.regularMarketPrice?.raw || null;
-
-        const fairValues = {
-          PER: (perAvg && perCurrent) ? (perAvg / perCurrent) * priceCurrent : null,
-          PCF: pcfCurrent ? priceCurrent : null,
-          PSR: psrCurrent ? priceCurrent : null,
-          PBR: (pbrAvg && pbrCurrent) ? (pbrAvg / pbrCurrent) * priceCurrent : null
-          //PBR: pbrCurrent ? priceCurrent : null
-        };
-
-        const fairValuesList = Object.values(fairValues).filter(v => typeof v === 'number');
-        const fairAvg = fairValuesList.length ? fairValuesList.reduce((a, b) => a + b, 0) / fairValuesList.length : null;
-
-        const upside = fairAvg && priceCurrent ? ((fairAvg / priceCurrent - 1) * 100) : null;
-
-        const couleur = upside > 0 ? 'green' : 'red';
-
-        displaySection('📐 Juste Valeur Estimée - Ratios Historiques', {
-          'Juste Valeur (PER)': fairValues.PER?.toFixed(2) || 'N/A',
-          'Juste Valeur (PCF)': fairValues.PCF?.toFixed(2) || 'N/A',
-          'Juste Valeur (PSR)': fairValues.PSR?.toFixed(2) || 'N/A',
-          'Juste Valeur (PBR)': fairValues.PBR?.toFixed(2) || 'N/A',
-          'Moyenne': fairAvg?.toFixed(2) || 'N/A',
-          'Potentiel (%)': upside !== null ? `${upside.toFixed(2)}%` : 'N/A'
-        });
-
-        const potentiel = document.createElement('div');
-        potentiel.className = 'section';
-        potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
-        resultsDiv.appendChild(potentiel);
-
-      } catch (error) {
-        resultsDiv.innerHTML = '<p style="color:red">Erreur : ' + error.message + '</p>';
+      } catch (err) {
+        resultsDiv.innerHTML = `<p style="color:red">Erreur : ${err.message}</p>`;
       }
     }
   </script>
