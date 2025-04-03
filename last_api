@@ -50,7 +50,7 @@
   </style>
 </head>
 <body>
-  <h1>Exploration complète des APIs Marketstack & Yahoo Finance</h1>
+  <h1>Exploration complète des APIs Yahoo Finance</h1>
   <label for="symbol">Symbole boursier :</label>
   <input type="text" id="symbol" placeholder="Ex : AAPL">
   <button onclick="getAllStockData()">Obtenir les données</button>
@@ -187,8 +187,24 @@
         const perMoyenne5ans = perList.length ? perList.reduce((a, b) => a + b, 0) / perList.length : null;
         const perActuel = quote.summaryDetail?.trailingPE?.raw || null;
 
-        const fairValue = (perMoyenne5ans && perActuel && prixActuel) ? (perMoyenne5ans / perActuel) * prixActuel : null;
-        const potentiel = (fairValue && prixActuel) ? ((fairValue - prixActuel) / prixActuel) * 100 : 0;
+        const fairValuePER = (perMoyenne5ans && perActuel && prixActuel) ? (perMoyenne5ans / perActuel) * prixActuel : null;
+
+        const pcfActuel = quote.defaultKeyStatistics?.priceToCashFlow?.raw || null;
+        const psrActuel = quote.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
+        const pbrActuel = quote.defaultKeyStatistics?.priceToBook?.raw || null;
+
+        const pcfMoy = 15;
+        const psrMoy = 6;
+        const pbrMoy = 3;
+
+        const fairValuePCF = (pcfMoy && pcfActuel) ? (pcfMoy / pcfActuel) * prixActuel : null;
+        const fairValuePSR = (psrMoy && psrActuel) ? (psrMoy / psrActuel) * prixActuel : null;
+        const fairValuePBR = (pbrMoy && pbrActuel) ? (pbrMoy / pbrActuel) * prixActuel : null;
+
+        const justes = [fairValuePER, fairValuePCF, fairValuePSR, fairValuePBR].filter(v => typeof v === 'number');
+        const fairValueMoy = justes.length ? justes.reduce((a, b) => a + b, 0) / justes.length : null;
+
+        const potentiel = (fairValueMoy && prixActuel) ? ((fairValueMoy - prixActuel) / prixActuel) * 100 : 0;
 
         displaySection('📊 Données Générales - Yahoo', {
           nom: quote.price?.longName,
@@ -199,10 +215,11 @@
         });
 
         displaySection('📐 Calcul de la Juste Valeur', {
-          'PER moyen 5 ans': perMoyenne5ans?.toFixed(2),
-          'PER actuel': perActuel?.toFixed(2),
-          'Prix actuel': prixActuel?.toFixed(2),
-          'Juste valeur estimée': fairValue?.toFixed(2),
+          'Juste Valeur (PER)': fairValuePER?.toFixed(2),
+          'Juste Valeur (PCF)': fairValuePCF?.toFixed(2),
+          'Juste Valeur (PSR)': fairValuePSR?.toFixed(2),
+          'Juste Valeur (PBR)': fairValuePBR?.toFixed(2),
+          'Moyenne Juste Valeur': fairValueMoy?.toFixed(2),
           'Potentiel (%)': potentiel?.toFixed(2)
         });
 
