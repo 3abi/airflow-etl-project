@@ -72,9 +72,13 @@
     }
 
     async function fetchYahooChart(symbol) {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1mo&range=5y`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Erreur Yahoo Chart');
+      const url = `https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo`;
+      const response = await fetch(url, {
+        headers: {
+          'x-api-key': yahooFinanceApiKey
+        }
+      });
+      if (!response.ok) throw new Error('Erreur Yahoo Chart via yfapi.net');
       return await response.json();
     }
 
