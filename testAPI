@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Analyse Boursière Complète</title>
+  <title>Analyse Boursière avec Yahoo Finance API</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
   <style>
@@ -28,10 +28,6 @@
     button:hover {
       background-color: #0056b3;
     }
-    button:disabled {
-      background-color: #cccccc;
-      cursor: not-allowed;
-    }
     .section {
       background: #fff;
       margin: 20px 0;
@@ -56,70 +52,24 @@
       margin: 20px 0;
       max-width: 100%;
     }
-    .loading {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .spinner {
-      border: 4px solid rgba(0, 0, 0, 0.1);
-      border-radius: 50%;
-      border-top: 4px solid #007bff;
-      width: 20px;
-      height: 20px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .error {
-      color: #dc3545;
-      background-color: #f8d7da;
-      padding: 10px;
+    .toggle-btn {
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-bottom: 10px;
       border-radius: 4px;
-    }
-    .ratio-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 15px;
-      margin: 15px 0;
-    }
-    .ratio-card {
-      border: 1px solid #dee2e6;
-      border-radius: 5px;
-      padding: 10px;
-      background: #f8f9fa;
-    }
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10px 0;
-    }
-    .data-table th, .data-table td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: left;
-    }
-    .data-table th {
-      background-color: #f2f2f2;
-    }
-    .info {
-      color: #0dcaf0;
-      background-color: #d1ecf1;
-      padding: 10px;
-      border-radius: 4px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <h1>Analyse Boursière Complète <small>(via Yahoo Finance API)</small></h1>
-  
+  <h1>Analyse Financière PROMETHEE <small>(via Yahoo Finance API)</small></h1>
+
   <div class="section">
     <label for="symbol">Symbole boursier :</label>
     <input type="text" id="symbol" placeholder="Ex : AAPL, MSFT, TSLA">
     <button id="fetchBtn" onclick="getAllStockData()">Analyser</button>
-    <p class="info">Utilisation de l'API Yahoo Finance via RapidAPI</p>
   </div>
 
   <div id="charts">
@@ -130,290 +80,147 @@
   <div id="results"></div>
 
   <script>
-    // Configuration API
-    const rapidApiKey = 'VOTRE_CLE_API'; // À remplacer par votre clé
+    const rapidApiKey = 'YOUR_RAPIDAPI_KEY';
     const rapidApiHost = 'apidojo-yahoo-finance-v1.p.rapidapi.com';
-    
-    // Variables d'état
-    let apiCallCount = 0;
-    const apiCallLimit = 5;
-    let lastApiCallTime = 0;
-    
-    // Éléments UI
-    const fetchBtn = document.getElementById('fetchBtn');
-    
-    // ==================== Fonctions API ====================
-    
-    async function makeApiRequest(url) {
-      if (apiCallCount >= apiCallLimit) {
-        throw new Error('Limite d\'appels API atteinte (plan gratuit)');
-      }
-      
-      const now = Date.now();
-      if (now - lastApiCallTime < 1000) {
-        await new Promise(resolve => setTimeout(resolve, 1000 - (now - lastApiCallTime)));
-      }
-      
-      try {
-        const response = await fetch(url, {
-          headers: {
-            'X-RapidAPI-Key': rapidApiKey,
-            'X-RapidAPI-Host': rapidApiHost
-          }
-        });
-        
-        lastApiCallTime = Date.now();
-        apiCallCount++;
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Erreur API: ${response.status} - ${errorText}`);
-        }
-        
-        const data = await response.json();
-        if (!data) throw new Error("Réponse API vide");
-        
-        return data;
-      } catch (error) {
-        console.error('Erreur API:', { url, error });
-        throw new Error(`Échec requête API: ${error.message}`);
-      }
-    }
-    
-    async function fetchMarketSummary() {
+
+    async function fetchYahooSummary(symbol) {
       const url = `https://${rapidApiHost}/market/v2/get-summary?region=US`;
-      const data = await makeApiRequest(url);
-      
-      if (!data.marketSummaryResponse) {
-        throw new Error("Format de données inattendu pour le résumé marché");
-      }
-      
-      return data.marketSummaryResponse.result;
+      const res = await fetch(url, {
+        headers: {
+          'X-RapidAPI-Key': rapidApiKey,
+          'X-RapidAPI-Host': rapidApiHost
+        }
+      });
+      return await res.json();
     }
-    
-    async function fetchStockChart(symbol) {
-      const url = `https://${rapidApiHost}/stock/v3/get-chart?interval=1mo&region=US&symbol=${symbol}&range=5y&includePrePost=false&useYfid=true&includeAdjustedClose=true`;
-      const data = await makeApiRequest(url);
-      
-      if (!data.chart?.result) {
-        throw new Error("Format de données inattendu pour le graphique");
-      }
-      
-      return data.chart.result[0];
+
+    async function fetchYahooChart(symbol) {
+      const url = `https://${rapidApiHost}/stock/v3/get-chart?interval=1mo&region=US&symbol=${symbol}&range=5y&includePrePost=false&useYfid=true&includeAdjustedClose=true&events=capitalGain%2Cdiv%2Csplit`;
+      const res = await fetch(url, {
+        headers: {
+          'X-RapidAPI-Key': rapidApiKey,
+          'X-RapidAPI-Host': rapidApiHost
+        }
+      });
+      return await res.json();
     }
-    
-    async function fetchStockStatistics(symbol) {
+
+    async function fetchYahooStatistics(symbol) {
       const url = `https://${rapidApiHost}/stock/v4/get-statistics?symbol=${symbol}&region=US&lang=en-US`;
-      const data = await makeApiRequest(url);
-      
-      if (!data.quoteType || !data.defaultKeyStatistics) {
-        throw new Error("Format de données inattendu pour les statistiques");
-      }
-      
-      return {
-        summary: data.quoteType,
-        stats: data.defaultKeyStatistics,
-        financialData: data.financialData || {},
-        price: data.price || {}
-      };
+      const res = await fetch(url, {
+        headers: {
+          'X-RapidAPI-Key': rapidApiKey,
+          'X-RapidAPI-Host': rapidApiHost
+        }
+      });
+      return await res.json();
     }
-    
-    // ==================== Fonctions d'affichage ====================
-    
-    function plotPriceChart(chartData, symbol) {
+
+    function plotPriceChart(timestamps, prices, symbol) {
       const ctx = document.getElementById('priceChart').getContext('2d');
       if (window.priceChartInstance) window.priceChartInstance.destroy();
-      
-      const timestamps = chartData.timestamp;
-      const closes = chartData.indicators.quote[0].close;
-      
+
       window.priceChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
           labels: timestamps.map(t => new Date(t * 1000).toLocaleDateString()),
           datasets: [{
             label: `Cours de ${symbol} (5 ans)`,
-            data: closes,
-            borderColor: 'rgba(0, 123, 255, 0.8)',
-            backgroundColor: 'rgba(0, 123, 255, 0.1)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.1
+            data: prices,
+            borderColor: 'blue',
+            fill: false,
+            tension: 0.2
           }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            tooltip: {
-              mode: 'index',
-              intersect: false
-            }
-          },
-          scales: {
-            x: {
-              title: { display: true, text: 'Date' },
-              grid: { display: false }
-            },
-            y: {
-              title: { display: true, text: 'Prix ($)' },
-              grid: { color: 'rgba(0,0,0,0.05)' }
-            }
-          }
         }
       });
     }
-    
-    function plotGaugeChart(value, max = 100) {
+
+    function plotGaugeChart(potential) {
       const ctx = document.getElementById('gaugeChart').getContext('2d');
       if (window.gaugeChartInstance) window.gaugeChartInstance.destroy();
-      
-      const normalizedValue = Math.min(Math.max(value, -max), max);
-      const color = normalizedValue >= 0 ? 'rgba(40, 167, 69, 0.8)' : 'rgba(220, 53, 69, 0.8)';
-      
+
       window.gaugeChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
           labels: ['Potentiel', ''],
           datasets: [{
-            data: [Math.abs(normalizedValue), max - Math.abs(normalizedValue)],
-            backgroundColor: [color, '#e9ecef'],
-            borderWidth: 0,
+            data: [Math.abs(potential), 100 - Math.abs(potential)],
+            backgroundColor: [potential >= 0 ? '#28a745' : '#dc3545', '#e9ecef'],
+            cutout: '70%',
             rotation: -90,
-            circumference: 180,
-            cutout: '70%'
+            circumference: 180
           }]
         },
         options: {
-          responsive: true,
           plugins: {
             tooltip: { enabled: false },
             legend: { display: false },
             datalabels: {
               display: true,
-              formatter: () => `${normalizedValue.toFixed(1)}%`,
+              formatter: () => `${potential.toFixed(1)}%`,
               color: '#212529',
-              font: { size: 18, weight: 'bold' },
-              anchor: 'center',
-              align: 'center'
+              font: { size: 18, weight: 'bold' }
             }
           }
         },
         plugins: [ChartDataLabels]
       });
     }
-    
-    function displayStockInfo(symbol, statistics, currentPrice) {
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '';
-      
-      // Informations de base
-      const basicInfo = `
-        <div class="section">
-          <h2>${symbol} - ${statistics.summary.shortName || 'N/A'}</h2>
-          <div class="ratio-grid">
-            <div class="ratio-card">
-              <h3>Prix actuel</h3>
-              <p style="font-size:1.4em;color:#007bff;">$${currentPrice?.toFixed(2) || 'N/A'}</p>
-            </div>
-            <div class="ratio-card">
-              <h3>Capitalisation</h3>
-              <p>${statistics.stats.marketCap ? (statistics.stats.marketCap / 1e9).toFixed(2) + ' Md$' : 'N/A'}</p>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      resultsDiv.innerHTML += basicInfo;
-      
-      // Ratios financiers
-      const ratiosHtml = `
-        <div class="section">
-          <h2>📈 Ratios Financiers</h2>
-          <div class="ratio-grid">
-            <div class="ratio-card">
-              <h3>PER</h3>
-              <p>${statistics.stats.trailingPE?.toFixed(2) || 'N/A'}</p>
-            </div>
-            <div class="ratio-card">
-              <h3>PBR</h3>
-              <p>${statistics.stats.priceToBook?.toFixed(2) || 'N/A'}</p>
-            </div>
-            <div class="ratio-card">
-              <h3>ROE</h3>
-              <p>${statistics.stats.returnOnEquity?.toFixed(2) || 'N/A'}</p>
-            </div>
-            <div class="ratio-card">
-              <h3>Dette/Equity</h3>
-              <p>${statistics.stats.debtToEquity?.toFixed(2) || 'N/A'}</p>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      resultsDiv.innerHTML += ratiosHtml;
-      
-      // Potentiel d'investissement
-      if (statistics.financialData?.targetMeanPrice) {
-        const targetPrice = statistics.financialData.targetMeanPrice;
-        const potential = ((targetPrice - currentPrice) / currentPrice) * 100;
-        
-        plotGaugeChart(potential);
-        
-        resultsDiv.innerHTML += `
-          <div class="section">
-            <h2>📊 Analyse de Potentiel</h2>
-            <p>Prix cible moyen: $${targetPrice.toFixed(2)}</p>
-            <p>Potentiel: ${potential.toFixed(2)}%</p>
-          </div>
-        `;
-      }
+
+    function displaySection(title, data) {
+      const section = document.createElement('div');
+      section.className = 'section';
+      section.innerHTML = `<h2>${title}</h2><pre>${JSON.stringify(data, null, 2)}</pre>`;
+      document.getElementById('results').appendChild(section);
     }
-    
-    // ==================== Fonction Principale ====================
-    
+
     async function getAllStockData() {
       const symbol = document.getElementById('symbol').value.trim().toUpperCase();
-      if (!symbol) return alert("Veuillez saisir un symbole boursier");
-      
-      // Réinitialisation
       const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = `
-        <div class="loading">
-          <span class="spinner"></span>
-          <span>Analyse de ${symbol} en cours...</span>
-        </div>
-      `;
-      
-      fetchBtn.disabled = true;
-      fetchBtn.textContent = 'Chargement...';
-      
+      resultsDiv.innerHTML = '';
+
       try {
-        // Appels API en parallèle
-        const [chartData, statistics] = await Promise.all([
-          fetchStockChart(symbol),
-          fetchStockStatistics(symbol)
+        const [chart, stats] = await Promise.all([
+          fetchYahooChart(symbol),
+          fetchYahooStatistics(symbol)
         ]);
-        
-        // Récupération du prix actuel
-        const currentPrice = chartData.meta.regularMarketPrice;
-        
-        // Affichage des données
-        plotPriceChart(chartData, symbol);
-        displayStockInfo(symbol, statistics, currentPrice);
-        
-      } catch (error) {
-        console.error('Erreur principale:', error);
-        resultsDiv.innerHTML = `
-          <div class="error">
-            <p>Erreur lors de l'analyse de ${symbol}:</p>
-            <p><strong>${error.message}</strong></p>
-            ${error.message.includes('limite') ? 
-              '<p>Veuillez patienter 1 minute avant de réessayer</p>' : ''}
-          </div>
-        `;
-      } finally {
-        fetchBtn.disabled = false;
-        fetchBtn.textContent = 'Analyser';
+
+        const chartData = chart.chart.result[0];
+        const timestamps = chartData.timestamp;
+        const prices = chartData.indicators.quote[0].close;
+        const currentPrice = prices[prices.length - 1];
+
+        plotPriceChart(timestamps, prices, symbol);
+
+        const shares = stats.defaultKeyStatistics?.sharesOutstanding?.raw || null;
+        const netIncome = stats.financialData?.netIncomeToCommon?.raw || null;
+        const revenue = stats.financialData?.totalRevenue?.raw || null;
+        const cashflow = stats.financialData?.operatingCashflow?.raw || null;
+        const equity = stats.balanceSheetHistory?.balanceSheetStatements?.[0]?.totalStockholderEquity?.raw || null;
+
+        const PERavg = (shares && netIncome) ? prices.slice(-5).reduce((a, p) => a + (p / (netIncome / shares)), 0) / 5 : null;
+        const PSRavg = (shares && revenue) ? prices.slice(-5).reduce((a, p) => a + (p / (revenue / shares)), 0) / 5 : null;
+        const PCFavg = (shares && cashflow) ? prices.slice(-5).reduce((a, p) => a + (p / (cashflow / shares)), 0) / 5 : null;
+        const PBRavg = (shares && equity) ? prices.slice(-5).reduce((a, p) => a + (p / (equity / shares)), 0) / 5 : null;
+
+        const trailingPE = stats.defaultKeyStatistics?.trailingPE?.raw || null;
+        const potential = (PERavg && trailingPE && currentPrice) ? (((PERavg / trailingPE) * currentPrice - currentPrice) / currentPrice) * 100 : 0;
+
+        const results = {
+          symbole: symbol,
+          prixActuel: currentPrice,
+          PERavg: PERavg?.toFixed(2) || 'N/A',
+          PBRavg: PBRavg?.toFixed(2) || 'N/A',
+          PSRavg: PSRavg?.toFixed(2) || 'N/A',
+          PCFavg: PCFavg?.toFixed(2) || 'N/A',
+          Potentiel: potential.toFixed(2) + '%'
+        };
+
+        displaySection('📊 Résumé Financier', results);
+        plotGaugeChart(potential);
+
+      } catch (e) {
+        resultsDiv.innerHTML = `<p style="color:red">Erreur : ${e.message}</p>`;
       }
     }
   </script>
