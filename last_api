@@ -90,7 +90,153 @@
       return await response.json();
     }
 
-    // Les autres fonctions (plotPriceChart, plotGaugeChart, getAllStockData) restent inchangées et peuvent être replacées ici sans erreur de syntaxe.
+    // === Affichage graphique ===
+function plotPriceChart(timestamps, prices, symbol) {
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  if (window.priceChartInstance) window.priceChartInstance.destroy();
+
+  window.priceChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: timestamps.map(t => new Date(t * 1000).toLocaleDateString()),
+      datasets: [{
+        label: `Cours de l'action ${symbol} (5 ans)` ,
+        data: prices,
+        borderColor: 'blue',
+        backgroundColor: 'lightblue',
+        fill: false,
+        tension: 0.1
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { title: { display: true, text: 'Date' } },
+        y: { title: { display: true, text: 'Prix de clôture' } }
+      }
+    }
+  });
+}
+
+function plotGaugeChart(potential) {
+  const ctx = document.getElementById('gaugeChart').getContext('2d');
+  if (window.gaugeChartInstance) window.gaugeChartInstance.destroy();
+
+  const value = Math.min(Math.max(potential, -100), 100);
+  const color = value >= 0 ? '#2ecc71' : '#e74c3c';
+
+  window.gaugeChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Potentiel', ''],
+      datasets: [{
+        data: [Math.abs(value), 100 - Math.abs(value)],
+        backgroundColor: [color, '#ddd'],
+        borderWidth: 0,
+        rotation: -90,
+        circumference: 180,
+        cutout: '70%'
+      }]
+    },
+    options: {
+      plugins: {
+        tooltip: { enabled: false },
+        legend: { display: false },
+        datalabels: {
+          display: true,
+          formatter: () => `${value.toFixed(1)}%`,
+          color: '#333',
+          font: { size: 18, weight: 'bold' }
+        }
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+}
+
+function displaySection(title, dataObj) {
+  const section = document.createElement('div');
+  section.className = 'section';
+  const h2 = document.createElement('h2');
+  h2.textContent = title;
+  const toggleBtn = document.createElement('button');
+  toggleBtn.textContent = 'Afficher/Masquer';
+  toggleBtn.className = 'toggle-btn';
+  const pre = document.createElement('pre');
+  pre.textContent = JSON.stringify(dataObj, null, 2);
+  toggleBtn.onclick = () => {
+    pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+  };
+  section.appendChild(h2);
+  section.appendChild(toggleBtn);
+  section.appendChild(pre);
+  document.getElementById('results').appendChild(section);
+}
+
+async function getAllStockData() {
+  const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+  if (!symbol) return alert("Veuillez saisir un symbole.");
+
+  const resultsDiv = document.getElementById('results');
+  resultsDiv.innerHTML = '<p>Chargement...</p>';
+
+  try {
+    const [financials, chartData] = await Promise.all([
+      fetchYahooData(symbol),
+      fetchYahooChart(symbol)
+    ]);
+
+    const chart = chartData.chart.result[0];
+    const timestamps = chart.timestamp;
+    const closePrices = chart.indicators.quote[0].close;
+    const prixActuel = closePrices[closePrices.length - 1];
+    plotPriceChart(timestamps, closePrices, symbol);
+
+    // Simuler les états financiers pour tests
+    const shares = 15022100480;
+    const netIncomes = [100e9, 110e9, 98e9, 102e9, 105e9];
+    const totalRevenue = [400e9, 420e9, 430e9, 415e9, 440e9];
+    const totalCashFlow = [80e9, 85e9, 90e9, 87e9, 92e9];
+    const totalBookValue = [65e9, 67e9, 69e9, 70e9, 72e9];
+
+    const PERavg = netIncomes.length ? closePrices.slice(-5).reduce((acc, price, i) => acc + (price / (netIncomes[i] / shares)), 0) / netIncomes.length : null;
+    const PBRavg = totalBookValue.length ? closePrices.slice(-5).reduce((acc, price, i) => acc + (price / (totalBookValue[i] / shares)), 0) / totalBookValue.length : null;
+    const PSRavg = totalRevenue.length ? closePrices.slice(-5).reduce((acc, price, i) => acc + (price / (totalRevenue[i] / shares)), 0) / totalRevenue.length : null;
+    const PCFavg = totalCashFlow.length ? closePrices.slice(-5).reduce((acc, price, i) => acc + (price / (totalCashFlow[i] / shares)), 0) / totalCashFlow.length : null;
+
+    const PERcurrent = PERavg; // pour test
+    const PBRcurrent = PBRavg;
+    const PSRcurrent = PSRavg;
+    const PCFcurrent = PCFavg;
+
+    const PERjusteValeur = (PERavg && PERcurrent) ? (PERavg / PERcurrent) * prixActuel : null;
+    const PBRjusteValeur = (PBRavg && PBRcurrent) ? (PBRavg / PBRcurrent) * prixActuel : null;
+    const PSRjusteValeur = (PSRavg && PSRcurrent) ? (PSRavg / PSRcurrent) * prixActuel : null;
+    const PCFjusteValeur = (PCFavg && PCFcurrent) ? (PCFavg / PCFcurrent) * prixActuel : null;
+
+    const fairValues = [PERjusteValeur, PBRjusteValeur, PSRjusteValeur, PCFjusteValeur].filter(v => typeof v === 'number');
+    const moyenneJusteValeur = fairValues.length ? fairValues.reduce((a, b) => a + b, 0) / fairValues.length : null;
+    const potentiel = moyenneJusteValeur && prixActuel ? ((moyenneJusteValeur - prixActuel) / prixActuel) * 100 : null;
+
+    displaySection('📊 Ratios calculés', {
+      PERavg, PBRavg, PSRavg, PCFavg,
+      PERcurrent, PBRcurrent, PSRcurrent, PCFcurrent
+    });
+
+    displaySection('📐 Justes valeurs estimées', {
+      'Juste valeur (PER)': PERjusteValeur?.toFixed(2),
+      'Juste valeur (PBR)': PBRjusteValeur?.toFixed(2),
+      'Juste valeur (PSR)': PSRjusteValeur?.toFixed(2),
+      'Juste valeur (PCF)': PCFjusteValeur?.toFixed(2),
+      'Moyenne': moyenneJusteValeur?.toFixed(2),
+      'Potentiel (%)': potentiel?.toFixed(2)
+    });
+
+    plotGaugeChart(potentiel);
+  } catch (error) {
+    resultsDiv.innerHTML = '<p style="color:red">Erreur : ' + error.message + '</p>';
+  }
+}
   </script>
 </body>
 </html>
