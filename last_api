@@ -149,7 +149,7 @@
 
   <script>
     // Configuration API
-    const rapidApiKey = 'YOUR_RAPIDAPI_KEY'; // Remplacez par votre clé
+    const rapidApiKey = ''; // Remplacez par votre clé
     const rapidApiHost = 'apidojo-yahoo-finance-v1.p.rapidapi.com';
     
     // Variables d'état
@@ -173,7 +173,7 @@
       }
       
       try {
-        const url = `https://${rapidApiHost}/stock/v2/get-summary?symbol=${symbol}&region=US`;
+        const url = `https://${rapidApiHost}/market/v2/get-summary?symbol=${symbol}&region=US`;
         const response = await fetch(url, {
           method: 'GET',
           headers: {
@@ -257,7 +257,7 @@
       }
       
       try {
-        const url = `https://${rapidApiHost}/stock/v2/get-key-statistics?symbol=${symbol}`;
+        const url = `https://${rapidApiHost}/stock/v4/get-statistics?symbol=${symbol}`;
         const response = await fetch(url, {
           method: 'GET',
           headers: {
