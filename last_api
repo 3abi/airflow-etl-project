@@ -60,26 +60,36 @@
   <div id="results"></div>
 
   <script>
-    const yahooFinanceApiKey = 'TA_CLE_ICI';
+    const rapidApiKey = 'TA_CLE_RAPIDAPI_ICI';
+const rapidApiHost = 'apidojo-yahoo-finance-v1.p.rapidapi.com';
 
     async function fetchYahooData(symbol) {
-      const modules = ["price","summaryDetail","financialData","defaultKeyStatistics","earnings"].join(',');
-      const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=${modules}`;
-      const res = await fetch(url, { headers: { 'x-api-key': yahooFinanceApiKey } });
-      if (!res.ok) throw new Error("Erreur lors de l'appel à Yahoo Finance API");
-      const json = await res.json();
-      return json.quoteSummary.result[0];
+  const url = `https://${rapidApiHost}/stock/v2/get-financials?symbol=${symbol}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-RapidAPI-Key': rapidApiKey,
+      'X-RapidAPI-Host': rapidApiHost
+    }
+  });
+  if (!response.ok) throw new Error('Erreur RapidAPI Yahoo Finance - financials');
+  const json = await response.json();
+  return json;
+}
     }
 
     async function fetchYahooChart(symbol) {
-      const url = `https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo`;
-      const response = await fetch(url, {
-        headers: {
-          'x-api-key': yahooFinanceApiKey
-        }
-      });
-      if (!response.ok) throw new Error('Erreur Yahoo Chart via yfapi.net');
-      return await response.json();
+  const url = `https://${rapidApiHost}/stock/v3/get-chart?symbol=${symbol}&interval=1mo&range=5y&region=US`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-RapidAPI-Key': rapidApiKey,
+      'X-RapidAPI-Host': rapidApiHost
+    }
+  });
+  if (!response.ok) throw new Error('Erreur Yahoo Chart via RapidAPI');
+  return await response.json();
+}
     }
 
     function plotPriceChart(timestamps, prices, symbol) {
