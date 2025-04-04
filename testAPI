@@ -1,12 +1,178 @@
-Tracking Prevention blocked access to storage for https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1mo&range=5y.
-yahoo%20financ%20hist%205%20ans.html:1  Tracking Prevention blocked access to storage for https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1mo&range=5y.
-yahoo%20financ%20hist%205%20ans.html:1  Access to fetch at 'https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1mo&range=5y' from origin 'null' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. If an opaque response serves your needs, set the request's mode to 'no-cors' to fetch the resource with CORS disabled.
-query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1mo&range=5y:1 
-            
-            
-            Failed to load resource: net::ERR_FAILED
-[NOUVEAU] Expliquez les erreurs de la console à l’aide de Copilot pour Edge : cliquez sur
-         
-         pour expliquer une erreur.
-        En savoir plus
-        Ne plus afficher
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Analyse Boursière avec Yahoo Finance API</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+      margin: 5px 0;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .section {
+      background: #fff;
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      color: #333;
+    }
+    pre {
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+    canvas {
+      background: #fff;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      margin: 20px 0;
+      max-width: 100%;
+    }
+    .toggle-btn {
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .loading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top: 4px solid #007bff;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .warning {
+      color: #ffc107;
+      background-color: #fff3cd;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .error {
+      color: #dc3545;
+      background-color: #f8d7da;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .info {
+      color: #0dcaf0;
+      background-color: #d1ecf1;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .ratio-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+      margin: 15px 0;
+    }
+    .ratio-card {
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      padding: 10px;
+      background: #f8f9fa;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+    .data-table th, .data-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    .data-table th {
+      background-color: #f2f2f2;
+    }
+    .data-table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+  </style>
+</head>
+<body>
+  <h1>Analyse Financière PROMETHEE <small>(via Yahoo Finance API)</small></h1>
+
+  <div class="section">
+    <label for="symbol">Symbole boursier :</label>
+    <input type="text" id="symbol" placeholder="Ex : AAPL, MSFT, TSLA">
+    <button id="fetchBtn" onclick="getAllStockData()">Analyser</button>
+    <p class="info">Clé API gratuite - limitez vos requêtes (max ~5/min)</p>
+  </div>
+
+  <div id="charts">
+    <canvas id="priceChart" width="800" height="400"></canvas>
+    <canvas id="gaugeChart" width="500" height="250"></canvas>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    const rapidApiKey = 'YOUR_RAPIDAPI_KEY';
+    const rapidApiHost = 'apidojo-yahoo-finance-v1.p.rapidapi.com';
+
+    async function fetchYahooData(symbol) {
+      const url = `https://${rapidApiHost}/stock/v2/get-summary?symbol=${symbol}&region=US`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-RapidAPI-Key': rapidApiKey,
+          'X-RapidAPI-Host': rapidApiHost
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur API: ${response.status}`);
+      }
+
+      const json = await response.json();
+      if (!json || Object.keys(json).length === 0) {
+        throw new Error("Réponse JSON vide ou invalide");
+      }
+      return json;
+    }
+
+    // Les autres fonctions restent inchangées
+  </script>
+</body>
+</html>
