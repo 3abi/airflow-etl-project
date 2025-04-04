@@ -112,6 +112,22 @@
       padding: 10px;
       background: #f8f9fa;
     }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+    .data-table th, .data-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    .data-table th {
+      background-color: #f2f2f2;
+    }
+    .data-table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
   </style>
 </head>
 <body>
@@ -133,12 +149,12 @@
 
   <script>
     // Configuration API
-    const rapidApiKey = 'TA_CLE_RAPIDAPI_ICI'; // Remplacez par votre clé
-    const rapidApiHost = 'apidojo-yahoo-finance-v1.papidev.com'; // Endpoint gratuit alternatif
+    const rapidApiKey = 'YOUR_RAPIDAPI_KEY'; // Remplacez par votre clé
+    const rapidApiHost = 'apidojo-yahoo-finance-v1.p.rapidapi.com';
     
     // Variables d'état
     let apiCallCount = 0;
-    const apiCallLimit = 5; // Limite approximative pour le plan gratuit
+    const apiCallLimit = 5;
     let lastApiCallTime = 0;
     
     // Éléments UI
@@ -157,7 +173,7 @@
       }
       
       try {
-        const url = `https://${rapidApiHost}/stock/v2/get-financials?symbol=${symbol}`;
+        const url = `https://${rapidApiHost}/stock/v2/get-summary?symbol=${symbol}&region=US`;
         const response = await fetch(url, {
           method: 'GET',
           headers: {
@@ -176,10 +192,15 @@
           throw new Error(`Erreur API: ${response.status}`);
         }
         
-        return await response.json();
+        const text = await response.text();
+        if (!text.trim()) {
+          throw new Error('Réponse vide de l\'API');
+        }
+        
+        return JSON.parse(text);
       } catch (error) {
         console.error('Erreur fetchYahooData:', error);
-        throw error;
+        throw new Error(`Impossible de récupérer les données: ${error.message}`);
       }
     }
     
@@ -194,7 +215,7 @@
       }
       
       try {
-        const url = `https://${rapidApiHost}/stock/v3/get-chart?symbol=${symbol}&interval=1mo&range=5y&region=US`;
+        const url = `https://${rapidApiHost}/stock/v3/get-chart?interval=1mo&range=5y&symbol=${symbol}&region=US`;
         const response = await fetch(url, {
           method: 'GET',
           headers: {
@@ -213,10 +234,15 @@
           throw new Error(`Erreur API: ${response.status}`);
         }
         
-        return await response.json();
+        const data = await response.json();
+        if (!data.chart?.result) {
+          throw new Error('Format de données inattendu');
+        }
+        
+        return data;
       } catch (error) {
         console.error('Erreur fetchYahooChart:', error);
-        throw error;
+        throw new Error(`Impossible de récupérer le graphique: ${error.message}`);
       }
     }
     
@@ -253,7 +279,7 @@
         return await response.json();
       } catch (error) {
         console.error('Erreur fetchYahooKeyStats:', error);
-        throw error;
+        throw new Error(`Impossible de récupérer les statistiques: ${error.message}`);
       }
     }
     
@@ -402,136 +428,184 @@
       document.getElementById('results').appendChild(container);
     }
     
+    function displayFinancialTable(title, data) {
+      const section = document.createElement('div');
+      section.className = 'section';
+      section.innerHTML = `<h2>${title}</h2>`;
+      
+      const table = document.createElement('table');
+      table.className = 'data-table';
+      
+      // En-tête
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headerRow.innerHTML = '<th>Année</th><th>Valeur (en milliards $)</th>';
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+      
+      // Corps
+      const tbody = document.createElement('tbody');
+      data.forEach((value, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>Année ${data.length - index}</td>
+          <td>${(value / 1e9).toFixed(2)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      
+      section.appendChild(table);
+      document.getElementById('results').appendChild(section);
+    }
+    
     // ==================== Calculs Financiers ====================
     
     function extractFinancialData(financials, keyStats) {
-      // Données annuelles (les plus récentes en premier)
-      const financialData = {
-        // Revenus
-        revenue: financials.incomeStatementHistory.incomeStatementHistory.map(
-          y => y.totalRevenue.raw
-        ).reverse(),
+      try {
+        // Données annuelles (les plus récentes en premier)
+        const financialData = {
+          // Revenus
+          revenue: financials.incomeStatementHistory.incomeStatementHistory.map(
+            y => y.totalRevenue?.raw || 0
+          ).reverse(),
+          
+          // Bénéfices
+          netIncome: financials.incomeStatementHistory.incomeStatementHistory.map(
+            y => y.netIncome?.raw || 0
+          ).reverse(),
+          
+          // Cash flow
+          operatingCashflow: financials.cashflowStatementHistory.cashflowStatements.map(
+            y => y.totalCashFromOperatingActivities?.raw || 0
+          ).reverse(),
+          
+          // Book value
+          bookValue: keyStats?.defaultKeyStatistics?.bookValue?.raw || null,
+          
+          // Actions en circulation
+          sharesOutstanding: financials.defaultKeyStatistics?.sharesOutstanding?.raw || 
+                           keyStats?.defaultKeyStatistics?.sharesOutstanding?.raw || null,
+          
+          // Prix actuel
+          currentPrice: financials.price?.regularMarketPrice?.raw || null,
+          
+          // Ratios standards
+          trailingPE: financials.defaultKeyStatistics?.trailingPE?.raw || null,
+          priceToBook: financials.defaultKeyStatistics?.priceToBook?.raw || null,
+          priceToSales: financials.summaryDetail?.priceToSalesTrailing12Months?.raw || null
+        };
         
-        // Bénéfices
-        netIncome: financials.incomeStatementHistory.incomeStatementHistory.map(
-          y => y.netIncome.raw
-        ).reverse(),
-        
-        // Cash flow
-        operatingCashflow: financials.cashflowStatementHistory.cashflowStatements.map(
-          y => y.totalCashFromOperatingActivities.raw
-        ).reverse(),
-        
-        // Book value
-        bookValue: keyStats?.defaultKeyStatistics?.bookValue?.raw || null,
-        
-        // Actions en circulation
-        sharesOutstanding: financials.defaultKeyStatistics?.sharesOutstanding?.raw || 
-                         keyStats?.defaultKeyStatistics?.sharesOutstanding?.raw || null,
-        
-        // Prix actuel
-        currentPrice: financials.price?.regularMarketPrice?.raw || null,
-        
-        // Ratios standards
-        trailingPE: financials.defaultKeyStatistics?.trailingPE?.raw || null,
-        priceToBook: financials.defaultKeyStatistics?.priceToBook?.raw || null,
-        priceToSales: financials.summaryDetail?.priceToSalesTrailing12Months?.raw || null
-      };
-      
-      return financialData;
+        return financialData;
+      } catch (error) {
+        console.error('Erreur extractFinancialData:', error);
+        throw new Error('Format de données financières inattendu');
+      }
     }
     
     function calculateRatios(financialData, historicalPrices) {
-      if (!financialData.sharesOutstanding || financialData.sharesOutstanding <= 0) {
-        throw new Error('Données insuffisantes sur les actions en circulation');
-      }
-      
-      const shares = financialData.sharesOutstanding;
-      const currentPrice = financialData.currentPrice;
-      
-      // Calcul des bénéfices par action (EPS)
-      const eps = financialData.netIncome.map(income => income / shares);
-      
-      // Calcul des ratios
-      const ratios = {
-        // Ratios actuels
-        'PER (actuel)': financialData.trailingPE || 
-                       (currentPrice && eps.length ? currentPrice / eps[eps.length-1] : null),
-        'PBR (actuel)': financialData.priceToBook || 
-                       (currentPrice && financialData.bookValue ? 
-                        currentPrice / (financialData.bookValue / shares) : null),
-        'PSR (actuel)': financialData.priceToSales || 
-                       (currentPrice && financialData.revenue.length ? 
-                        currentPrice / (financialData.revenue[financialData.revenue.length-1] / shares) : null),
-        
-        // Moyennes historiques (5 ans)
-        'PER (moyenne)': eps.length && historicalPrices.length ? 
-                         historicalPrices.slice(-5).reduce((sum, price, i) => 
-                           sum + (price / (eps[i] || 1)), 0) / Math.min(5, eps.length) : null,
-        
-        'PBR (moyenne)': financialData.bookValue && historicalPrices.length ? 
-                         historicalPrices.slice(-5).reduce((sum, price, i) => 
-                           sum + (price / (financialData.bookValue / shares)), 0) / 
-                         Math.min(5, historicalPrices.length) : null,
-        
-        'PSR (moyenne)': financialData.revenue.length && historicalPrices.length ? 
-                          historicalPrices.slice(-5).reduce((sum, price, i) => 
-                            sum + (price / (financialData.revenue[i] / shares)), 0) / 
-                          Math.min(5, financialData.revenue.length) : null,
-        
-        'PCF (moyenne)': financialData.operatingCashflow.length && historicalPrices.length ? 
-                          historicalPrices.slice(-5).reduce((sum, price, i) => 
-                            sum + (price / (financialData.operatingCashflow[i] / shares)), 0) / 
-                          Math.min(5, financialData.operatingCashflow.length) : null
-      };
-      
-      // Nettoyage des ratios invalides
-      for (const [key, value] of Object.entries(ratios)) {
-        if (value === null || isNaN(value) || !isFinite(value)) {
-          ratios[key] = 'N/A';
+      try {
+        if (!financialData.sharesOutstanding || financialData.sharesOutstanding <= 0) {
+          throw new Error('Données insuffisantes sur les actions en circulation');
         }
+        
+        const shares = financialData.sharesOutstanding;
+        const currentPrice = financialData.currentPrice;
+        
+        // Calcul des bénéfices par action (EPS)
+        const eps = financialData.netIncome.map(income => income / shares);
+        
+        // Calcul des ratios
+        const ratios = {
+          // Ratios actuels
+          'PER (actuel)': financialData.trailingPE || 
+                         (currentPrice && eps.length ? currentPrice / eps[eps.length-1] : null),
+          'PBR (actuel)': financialData.priceToBook || 
+                         (currentPrice && financialData.bookValue ? 
+                          currentPrice / (financialData.bookValue / shares) : null),
+          'PSR (actuel)': financialData.priceToSales || 
+                         (currentPrice && financialData.revenue.length ? 
+                          currentPrice / (financialData.revenue[financialData.revenue.length-1] / shares) : null),
+          
+          // Moyennes historiques (5 ans)
+          'PER (moyenne)': eps.length && historicalPrices.length ? 
+                           historicalPrices.slice(-5).reduce((sum, price, i) => 
+                             sum + (price / (eps[i] || 1)), 0) / Math.min(5, eps.length) : null,
+          
+          'PBR (moyenne)': financialData.bookValue && historicalPrices.length ? 
+                           historicalPrices.slice(-5).reduce((sum, price, i) => 
+                             sum + (price / (financialData.bookValue / shares)), 0) / 
+                           Math.min(5, historicalPrices.length) : null,
+          
+          'PSR (moyenne)': financialData.revenue.length && historicalPrices.length ? 
+                            historicalPrices.slice(-5).reduce((sum, price, i) => 
+                              sum + (price / (financialData.revenue[i] / shares)), 0) / 
+                            Math.min(5, financialData.revenue.length) : null,
+          
+          'PCF (moyenne)': financialData.operatingCashflow.length && historicalPrices.length ? 
+                            historicalPrices.slice(-5).reduce((sum, price, i) => 
+                              sum + (price / (financialData.operatingCashflow[i] / shares)), 0) / 
+                            Math.min(5, financialData.operatingCashflow.length) : null
+        };
+        
+        // Nettoyage des ratios invalides
+        for (const [key, value] of Object.entries(ratios)) {
+          if (value === null || isNaN(value) || !isFinite(value)) {
+            ratios[key] = 'N/A';
+          } else if (typeof value === 'number') {
+            ratios[key] = Number(value.toFixed(2));
+          }
+        }
+        
+        return ratios;
+      } catch (error) {
+        console.error('Erreur calculateRatios:', error);
+        throw new Error('Calcul des ratios impossible');
       }
-      
-      return ratios;
     }
     
     function calculateFairValues(ratios, currentPrice) {
-      if (!currentPrice) return null;
-      
-      const fairValues = {};
-      const validValues = [];
-      
-      // Calcul des justes valeurs pour chaque ratio valide
-      if (ratios['PER (moyenne)'] !== 'N/A' && ratios['PER (actuel)'] !== 'N/A') {
-        fairValues['Juste valeur (PER)'] = (ratios['PER (moyenne)'] / ratios['PER (actuel)']) * currentPrice;
-        validValues.push(fairValues['Juste valeur (PER)']);
+      try {
+        if (!currentPrice) return null;
+        
+        const fairValues = {};
+        const validValues = [];
+        
+        // Calcul des justes valeurs pour chaque ratio valide
+        if (ratios['PER (moyenne)'] !== 'N/A' && ratios['PER (actuel)'] !== 'N/A') {
+          fairValues['Juste valeur (PER)'] = (ratios['PER (moyenne)'] / ratios['PER (actuel)']) * currentPrice;
+          validValues.push(fairValues['Juste valeur (PER)']);
+        }
+        
+        if (ratios['PBR (moyenne)'] !== 'N/A' && ratios['PBR (actuel)'] !== 'N/A') {
+          fairValues['Juste valeur (PBR)'] = (ratios['PBR (moyenne)'] / ratios['PBR (actuel)']) * currentPrice;
+          validValues.push(fairValues['Juste valeur (PBR)']);
+        }
+        
+        if (ratios['PSR (moyenne)'] !== 'N/A' && ratios['PSR (actuel)'] !== 'N/A') {
+          fairValues['Juste valeur (PSR)'] = (ratios['PSR (moyenne)'] / ratios['PSR (actuel)']) * currentPrice;
+          validValues.push(fairValues['Juste valeur (PSR)']);
+        }
+        
+        if (ratios['PCF (moyenne)'] !== 'N/A') {
+          // Pour PCF, on suppose que le ratio actuel est le prix actuel / cash flow actuel
+          const currentPCF = currentPrice / (ratios['PCF (moyenne)']);
+          fairValues['Juste valeur (PCF)'] = (ratios['PCF (moyenne)'] / currentPCF) * currentPrice;
+          validValues.push(fairValues['Juste valeur (PCF)']);
+        }
+        
+        // Calcul de la moyenne des justes valeurs
+        if (validValues.length > 0) {
+          const moyenne = validValues.reduce((a, b) => a + b, 0) / validValues.length;
+          fairValues['Moyenne juste valeur'] = Number(moyenne.toFixed(2));
+          fairValues['Potentiel (%)'] = Number((((moyenne - currentPrice) / currentPrice) * 100).toFixed(2));
+        }
+        
+        return fairValues;
+      } catch (error) {
+        console.error('Erreur calculateFairValues:', error);
+        return null;
       }
-      
-      if (ratios['PBR (moyenne)'] !== 'N/A' && ratios['PBR (actuel)'] !== 'N/A') {
-        fairValues['Juste valeur (PBR)'] = (ratios['PBR (moyenne)'] / ratios['PBR (actuel)']) * currentPrice;
-        validValues.push(fairValues['Juste valeur (PBR)']);
-      }
-      
-      if (ratios['PSR (moyenne)'] !== 'N/A' && ratios['PSR (actuel)'] !== 'N/A') {
-        fairValues['Juste valeur (PSR)'] = (ratios['PSR (moyenne)'] / ratios['PSR (actuel)']) * currentPrice;
-        validValues.push(fairValues['Juste valeur (PSR)']);
-      }
-      
-      if (ratios['PCF (moyenne)'] !== 'N/A') {
-        // Pour PCF, on suppose que le ratio actuel est le prix actuel / cash flow actuel
-        const currentPCF = currentPrice / (ratios['PCF (moyenne)']);
-        fairValues['Juste valeur (PCF)'] = (ratios['PCF (moyenne)'] / currentPCF) * currentPrice;
-        validValues.push(fairValues['Juste valeur (PCF)']);
-      }
-      
-      // Calcul de la moyenne des justes valeurs
-      if (validValues.length > 0) {
-        const moyenne = validValues.reduce((a, b) => a + b, 0) / validValues.length;
-        fairValues['Moyenne juste valeur'] = moyenne;
-        fairValues['Potentiel (%)'] = ((moyenne - currentPrice) / currentPrice) * 100;
-      }
-      
-      return fairValues;
     }
     
     // ==================== Fonction Principale ====================
@@ -576,6 +650,11 @@
         const financialData = extractFinancialData(financials, keyStats);
         financialData.currentPrice = currentPrice; // Mise à jour avec le prix réel
         
+        // Affichage des données financières
+        displayFinancialTable('📊 Revenus annuels (en milliards $)', financialData.revenue);
+        displayFinancialTable('💰 Bénéfices nets annuels (en milliards $)', financialData.netIncome);
+        displayFinancialTable('💵 Cash-flow opérationnel annuel (en milliards $)', financialData.operatingCashflow);
+        
         // Calcul des ratios
         const ratios = calculateRatios(financialData, closePrices);
         
@@ -588,9 +667,9 @@
         // Cartes de ratios
         displayRatioCards({
           'Prix actuel': `${currentPrice.toFixed(2)} $`,
-          'PER': ratios['PER (actuel)'] !== 'N/A' ? ratios['PER (actuel)'].toFixed(2) : 'N/A',
-          'PBR': ratios['PBR (actuel)'] !== 'N/A' ? ratios['PBR (actuel)'].toFixed(2) : 'N/A',
-          'PSR': ratios['PSR (actuel)'] !== 'N/A' ? ratios['PSR (actuel)'].toFixed(2) : 'N/A',
+          'PER': ratios['PER (actuel)'] !== 'N/A' ? ratios['PER (actuel)'] : 'N/A',
+          'PBR': ratios['PBR (actuel)'] !== 'N/A' ? ratios['PBR (actuel)'] : 'N/A',
+          'PSR': ratios['PSR (actuel)'] !== 'N/A' ? ratios['PSR (actuel)'] : 'N/A',
           'Actions': (financialData.sharesOutstanding / 1e9).toFixed(2) + ' Md'
         });
         
@@ -600,14 +679,8 @@
           plotGaugeChart(fairValues['Potentiel (%)'] || 0);
         }
         
-        // Données détaillées
-        displaySection('📈 Données financières (5 ans)', {
-          Revenus: financialData.revenue,
-          'Bénéfices nets': financialData.netIncome,
-          'Cash-flow opérationnel': financialData.operatingCashflow
-        });
-        
-        displaySection('📉 Ratios calculés', ratios);
+        // Ratios détaillés
+        displaySection('📈 Ratios calculés', ratios);
         
       } catch (error) {
         console.error('Erreur principale:', error);
