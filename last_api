@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Analyse Boursière avec Yahoo Finance API</title>
+  <title>Analyse Boursière Complète</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
   <style>
@@ -56,15 +56,6 @@
       margin: 20px 0;
       max-width: 100%;
     }
-    .toggle-btn {
-      background-color: #6c757d;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      margin-bottom: 10px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
     .loading {
       display: flex;
       align-items: center;
@@ -82,21 +73,9 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-    .warning {
-      color: #ffc107;
-      background-color: #fff3cd;
-      padding: 10px;
-      border-radius: 4px;
-    }
     .error {
       color: #dc3545;
       background-color: #f8d7da;
-      padding: 10px;
-      border-radius: 4px;
-    }
-    .info {
-      color: #0dcaf0;
-      background-color: #d1ecf1;
       padding: 10px;
       border-radius: 4px;
     }
@@ -125,19 +104,22 @@
     .data-table th {
       background-color: #f2f2f2;
     }
-    .data-table tr:nth-child(even) {
-      background-color: #f9f9f9;
+    .info {
+      color: #0dcaf0;
+      background-color: #d1ecf1;
+      padding: 10px;
+      border-radius: 4px;
     }
   </style>
 </head>
 <body>
-  <h1>Analyse Financière PROMETHEE <small>(via Yahoo Finance API)</small></h1>
+  <h1>Analyse Boursière Complète <small>(via Yahoo Finance API)</small></h1>
   
   <div class="section">
     <label for="symbol">Symbole boursier :</label>
     <input type="text" id="symbol" placeholder="Ex : AAPL, MSFT, TSLA">
     <button id="fetchBtn" onclick="getAllStockData()">Analyser</button>
-    <p class="info">Clé API gratuite - limitez vos requêtes (max ~5/min)</p>
+    <p class="info">Utilisation de l'API Yahoo Finance via RapidAPI</p>
   </div>
 
   <div id="charts">
@@ -149,7 +131,7 @@
 
   <script>
     // Configuration API
-    const rapidApiKey = ''; // Remplacez par votre clé
+    const rapidApiKey = '0282ae7541msh14d14012243663cp18b34fjsn53e4b64572ce'; // À remplacer par votre clé
     const rapidApiHost = 'apidojo-yahoo-finance-v1.p.rapidapi.com';
     
     // Variables d'état
@@ -162,7 +144,7 @@
     
     // ==================== Fonctions API ====================
     
-    async function fetchYahooData(symbol) {
+    async function makeApiRequest(url) {
       if (apiCallCount >= apiCallLimit) {
         throw new Error('Limite d\'appels API atteinte (plan gratuit)');
       }
@@ -173,9 +155,7 @@
       }
       
       try {
-        const url = `https://${rapidApiHost}/market/v2/get-summary?symbol=${symbol}&region=US`;
         const response = await fetch(url, {
-          method: 'GET',
           headers: {
             'X-RapidAPI-Key': rapidApiKey,
             'X-RapidAPI-Host': rapidApiHost
@@ -186,108 +166,66 @@
         apiCallCount++;
         
         if (!response.ok) {
-          if (response.status === 429) {
-            throw new Error('Trop de requêtes - Attendez 1 minute');
-          }
-          throw new Error(`Erreur API: ${response.status}`);
-        }
-        
-        const text = await response.text();
-        if (!text.trim()) {
-          throw new Error('Réponse vide de l\'API');
-        }
-        
-        return JSON.parse(text);
-      } catch (error) {
-        console.error('Erreur fetchYahooData:', error);
-        throw new Error(`Impossible de récupérer les données: ${error.message}`);
-      }
-    }
-    
-    async function fetchYahooChart(symbol) {
-      if (apiCallCount >= apiCallLimit) {
-        throw new Error('Limite d\'appels API atteinte (plan gratuit)');
-      }
-      
-      const now = Date.now();
-      if (now - lastApiCallTime < 1000) {
-        await new Promise(resolve => setTimeout(resolve, 1000 - (now - lastApiCallTime)));
-      }
-      
-      try {
-        const url = `https://${rapidApiHost}/stock/v3/get-chart?interval=1mo&range=5y&symbol=${symbol}&region=US`;
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'X-RapidAPI-Key': rapidApiKey,
-            'X-RapidAPI-Host': rapidApiHost
-          }
-        });
-        
-        lastApiCallTime = Date.now();
-        apiCallCount++;
-        
-        if (!response.ok) {
-          if (response.status === 429) {
-            throw new Error('Trop de requêtes - Attendez 1 minute');
-          }
-          throw new Error(`Erreur API: ${response.status}`);
+          const errorText = await response.text();
+          throw new Error(`Erreur API: ${response.status} - ${errorText}`);
         }
         
         const data = await response.json();
-        if (!data.chart?.result) {
-          throw new Error('Format de données inattendu');
-        }
+        if (!data) throw new Error("Réponse API vide");
         
         return data;
       } catch (error) {
-        console.error('Erreur fetchYahooChart:', error);
-        throw new Error(`Impossible de récupérer le graphique: ${error.message}`);
+        console.error('Erreur API:', { url, error });
+        throw new Error(`Échec requête API: ${error.message}`);
       }
     }
     
-    async function fetchYahooKeyStats(symbol) {
-      if (apiCallCount >= apiCallLimit) {
-        throw new Error('Limite d\'appels API atteinte (plan gratuit)');
+    async function fetchMarketSummary() {
+      const url = `https://${rapidApiHost}/market/v2/get-summary?region=US`;
+      const data = await makeApiRequest(url);
+      
+      if (!data.marketSummaryResponse) {
+        throw new Error("Format de données inattendu pour le résumé marché");
       }
       
-      const now = Date.now();
-      if (now - lastApiCallTime < 1000) {
-        await new Promise(resolve => setTimeout(resolve, 1000 - (now - lastApiCallTime)));
+      return data.marketSummaryResponse.result;
+    }
+    
+    async function fetchStockChart(symbol) {
+      const url = `https://${rapidApiHost}/stock/v3/get-chart?interval=1mo&region=US&symbol=${symbol}&range=5y&includePrePost=false&useYfid=true&includeAdjustedClose=true`;
+      const data = await makeApiRequest(url);
+      
+      if (!data.chart?.result) {
+        throw new Error("Format de données inattendu pour le graphique");
       }
       
-      try {
-        const url = `https://${rapidApiHost}/stock/v4/get-statistics?symbol=${symbol}`;
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'X-RapidAPI-Key': rapidApiKey,
-            'X-RapidAPI-Host': rapidApiHost
-          }
-        });
-        
-        lastApiCallTime = Date.now();
-        apiCallCount++;
-        
-        if (!response.ok) {
-          if (response.status === 429) {
-            throw new Error('Trop de requêtes - Attendez 1 minute');
-          }
-          throw new Error(`Erreur API: ${response.status}`);
-        }
-        
-        return await response.json();
-      } catch (error) {
-        console.error('Erreur fetchYahooKeyStats:', error);
-        throw new Error(`Impossible de récupérer les statistiques: ${error.message}`);
+      return data.chart.result[0];
+    }
+    
+    async function fetchStockStatistics(symbol) {
+      const url = `https://${rapidApiHost}/stock/v4/get-statistics?symbol=${symbol}&region=US&lang=en-US`;
+      const data = await makeApiRequest(url);
+      
+      if (!data.quoteType || !data.defaultKeyStatistics) {
+        throw new Error("Format de données inattendu pour les statistiques");
       }
+      
+      return {
+        summary: data.quoteSummary,
+        stats: data.defaultKeyStatistics,
+       // financialData: data.financialData || {},
+        price: data.price || {}
+      };
     }
     
     // ==================== Fonctions d'affichage ====================
     
-    function plotPriceChart(timestamps, prices, symbol) {
+    function plotPriceChart(chartData, symbol) {
       const ctx = document.getElementById('priceChart').getContext('2d');
       if (window.priceChartInstance) window.priceChartInstance.destroy();
+      
+      const timestamps = chartData.timestamp;
+      const closes = chartData.indicators.quote[0].close;
       
       window.priceChartInstance = new Chart(ctx, {
         type: 'line',
@@ -295,7 +233,7 @@
           labels: timestamps.map(t => new Date(t * 1000).toLocaleDateString()),
           datasets: [{
             label: `Cours de ${symbol} (5 ans)`,
-            data: prices,
+            data: closes,
             borderColor: 'rgba(0, 123, 255, 0.8)',
             backgroundColor: 'rgba(0, 123, 255, 0.1)',
             borderWidth: 2,
@@ -325,19 +263,19 @@
       });
     }
     
-    function plotGaugeChart(potential) {
+    function plotGaugeChart(value, max = 100) {
       const ctx = document.getElementById('gaugeChart').getContext('2d');
       if (window.gaugeChartInstance) window.gaugeChartInstance.destroy();
       
-      const value = Math.min(Math.max(potential, -100), 100);
-      const color = value >= 0 ? 'rgba(40, 167, 69, 0.8)' : 'rgba(220, 53, 69, 0.8)';
+      const normalizedValue = Math.min(Math.max(value, -max), max);
+      const color = normalizedValue >= 0 ? 'rgba(40, 167, 69, 0.8)' : 'rgba(220, 53, 69, 0.8)';
       
       window.gaugeChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
           labels: ['Potentiel', ''],
           datasets: [{
-            data: [Math.abs(value), 100 - Math.abs(value)],
+            data: [Math.abs(normalizedValue), max - Math.abs(normalizedValue)],
             backgroundColor: [color, '#e9ecef'],
             borderWidth: 0,
             rotation: -90,
@@ -352,7 +290,7 @@
             legend: { display: false },
             datalabels: {
               display: true,
-              formatter: () => `${value.toFixed(1)}%`,
+              formatter: () => `${normalizedValue.toFixed(1)}%`,
               color: '#212529',
               font: { size: 18, weight: 'bold' },
               anchor: 'center',
@@ -364,255 +302,78 @@
       });
     }
     
-    function displaySection(title, dataObj, isOpen = false) {
-      const section = document.createElement('div');
-      section.className = 'section';
+    function displayStockInfo(symbol, statistics, currentPrice) {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
       
-      const header = document.createElement('div');
-      header.style.display = 'flex';
-      header.style.justifyContent = 'space-between';
-      header.style.alignItems = 'center';
+      // Informations de base
+      const basicInfo = `
+        <div class="section">
+          <h2>${symbol} - ${statistics.summary.shortName || 'N/A'}</h2>
+          <div class="ratio-grid">
+            <div class="ratio-card">
+              <h3>Prix actuel</h3>
+              <p style="font-size:1.4em;color:#007bff;">$${currentPrice?.toFixed(2) || 'N/A'}</p>
+            </div>
+            <div class="ratio-card">
+              <h3>Capitalisation</h3>
+              <p>${statistics.stats.marketCap ? (statistics.stats.marketCap / 1e9).toFixed(2) + ' Md$' : 'N/A'}</p>
+            </div>
+          </div>
+        </div>
+      `;
       
-      const h2 = document.createElement('h2');
-      h2.textContent = title;
+      resultsDiv.innerHTML += basicInfo;
       
-      const toggleBtn = document.createElement('button');
-      toggleBtn.textContent = isOpen ? 'Masquer' : 'Afficher';
-      toggleBtn.className = 'toggle-btn';
+      // Ratios financiers
+      const ratiosHtml = `
+        <div class="section">
+          <h2>📈 Ratios Financiers</h2>
+          <div class="ratio-grid">
+            <div class="ratio-card">
+              <h3>PER</h3>
+              <p>${statistics.stats.trailingPE?.toFixed(2) || 'N/A'}</p>
+            </div>
+            <div class="ratio-card">
+              <h3>PBR</h3>
+              <p>${statistics.stats.priceToBook?.toFixed(2) || 'N/A'}</p>
+            </div>
+            <div class="ratio-card">
+              <h3>ROE</h3>
+              <p>${statistics.stats.returnOnEquity?.toFixed(2) || 'N/A'}</p>
+            </div>
+            <div class="ratio-card">
+              <h3>Dette/Equity</h3>
+              <p>${statistics.stats.debtToEquity?.toFixed(2) || 'N/A'}</p>
+            </div>
+          </div>
+        </div>
+      `;
       
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(dataObj, null, 2);
-      pre.style.display = isOpen ? 'block' : 'none';
+      resultsDiv.innerHTML += ratiosHtml;
       
-      toggleBtn.onclick = () => {
-        const isNowOpen = pre.style.display === 'none';
-        pre.style.display = isNowOpen ? 'block' : 'none';
-        toggleBtn.textContent = isNowOpen ? 'Masquer' : 'Afficher';
-      };
-      
-      header.appendChild(h2);
-      header.appendChild(toggleBtn);
-      section.appendChild(header);
-      section.appendChild(pre);
-      document.getElementById('results').appendChild(section);
-    }
-    
-    function displayRatioCards(ratios) {
-      const container = document.createElement('div');
-      container.className = 'section';
-      container.innerHTML = '<h2>📈 Ratios Clés</h2>';
-      
-      const grid = document.createElement('div');
-      grid.className = 'ratio-grid';
-      
-      for (const [name, value] of Object.entries(ratios)) {
-        const card = document.createElement('div');
-        card.className = 'ratio-card';
-        
-        const title = document.createElement('h3');
-        title.textContent = name;
-        title.style.marginTop = '0';
-        
-        const val = document.createElement('p');
-        val.textContent = typeof value === 'number' ? value.toFixed(2) : value;
-        val.style.fontSize = '1.2em';
-        val.style.fontWeight = 'bold';
-        val.style.color = '#007bff';
-        
-        card.appendChild(title);
-        card.appendChild(val);
-        grid.appendChild(card);
-      }
-      
-      container.appendChild(grid);
-      document.getElementById('results').appendChild(container);
-    }
-    
-    function displayFinancialTable(title, data) {
-      const section = document.createElement('div');
-      section.className = 'section';
-      section.innerHTML = `<h2>${title}</h2>`;
-      
-      const table = document.createElement('table');
-      table.className = 'data-table';
-      
-      // En-tête
-      const thead = document.createElement('thead');
-      const headerRow = document.createElement('tr');
-      headerRow.innerHTML = '<th>Année</th><th>Valeur (en milliards $)</th>';
-      thead.appendChild(headerRow);
-      table.appendChild(thead);
-      
-      // Corps
-      const tbody = document.createElement('tbody');
-      data.forEach((value, index) => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>Année ${data.length - index}</td>
-          <td>${(value / 1e9).toFixed(2)}</td>
-        `;
-        tbody.appendChild(row);
-      });
-      table.appendChild(tbody);
-      
-      section.appendChild(table);
-      document.getElementById('results').appendChild(section);
-    }
-    
-    // ==================== Calculs Financiers ====================
-    
-    function extractFinancialData(financials, keyStats) {
-      try {
-        // Données annuelles (les plus récentes en premier)
-        const financialData = {
-          // Revenus
-          revenue: financials.incomeStatementHistory.incomeStatementHistory.map(
-            y => y.totalRevenue?.raw || 0
-          ).reverse(),
-          
-          // Bénéfices
-          netIncome: financials.incomeStatementHistory.incomeStatementHistory.map(
-            y => y.netIncome?.raw || 0
-          ).reverse(),
-          
-          // Cash flow
-          operatingCashflow: financials.cashflowStatementHistory.cashflowStatements.map(
-            y => y.totalCashFromOperatingActivities?.raw || 0
-          ).reverse(),
-          
-          // Book value
-          bookValue: keyStats?.defaultKeyStatistics?.bookValue?.raw || null,
-          
-          // Actions en circulation
-          sharesOutstanding: financials.defaultKeyStatistics?.sharesOutstanding?.raw || 
-                           keyStats?.defaultKeyStatistics?.sharesOutstanding?.raw || null,
-          
-          // Prix actuel
-          currentPrice: financials.price?.regularMarketPrice?.raw || null,
-          
-          // Ratios standards
-          trailingPE: financials.defaultKeyStatistics?.trailingPE?.raw || null,
-          priceToBook: financials.defaultKeyStatistics?.priceToBook?.raw || null,
-          priceToSales: financials.summaryDetail?.priceToSalesTrailing12Months?.raw || null
-        };
-        
-        return financialData;
-      } catch (error) {
-        console.error('Erreur extractFinancialData:', error);
-        throw new Error('Format de données financières inattendu');
-      }
-    }
-    
-    function calculateRatios(financialData, historicalPrices) {
-      try {
-        if (!financialData.sharesOutstanding || financialData.sharesOutstanding <= 0) {
-          throw new Error('Données insuffisantes sur les actions en circulation');
-        }
-        
-        const shares = financialData.sharesOutstanding;
-        const currentPrice = financialData.currentPrice;
-        
-        // Calcul des bénéfices par action (EPS)
-        const eps = financialData.netIncome.map(income => income / shares);
-        
-        // Calcul des ratios
-        const ratios = {
-          // Ratios actuels
-          'PER (actuel)': financialData.trailingPE || 
-                         (currentPrice && eps.length ? currentPrice / eps[eps.length-1] : null),
-          'PBR (actuel)': financialData.priceToBook || 
-                         (currentPrice && financialData.bookValue ? 
-                          currentPrice / (financialData.bookValue / shares) : null),
-          'PSR (actuel)': financialData.priceToSales || 
-                         (currentPrice && financialData.revenue.length ? 
-                          currentPrice / (financialData.revenue[financialData.revenue.length-1] / shares) : null),
-          
-          // Moyennes historiques (5 ans)
-          'PER (moyenne)': eps.length && historicalPrices.length ? 
-                           historicalPrices.slice(-5).reduce((sum, price, i) => 
-                             sum + (price / (eps[i] || 1)), 0) / Math.min(5, eps.length) : null,
-          
-          'PBR (moyenne)': financialData.bookValue && historicalPrices.length ? 
-                           historicalPrices.slice(-5).reduce((sum, price, i) => 
-                             sum + (price / (financialData.bookValue / shares)), 0) / 
-                           Math.min(5, historicalPrices.length) : null,
-          
-          'PSR (moyenne)': financialData.revenue.length && historicalPrices.length ? 
-                            historicalPrices.slice(-5).reduce((sum, price, i) => 
-                              sum + (price / (financialData.revenue[i] / shares)), 0) / 
-                            Math.min(5, financialData.revenue.length) : null,
-          
-          'PCF (moyenne)': financialData.operatingCashflow.length && historicalPrices.length ? 
-                            historicalPrices.slice(-5).reduce((sum, price, i) => 
-                              sum + (price / (financialData.operatingCashflow[i] / shares)), 0) / 
-                            Math.min(5, financialData.operatingCashflow.length) : null
-        };
-        
-        // Nettoyage des ratios invalides
-        for (const [key, value] of Object.entries(ratios)) {
-          if (value === null || isNaN(value) || !isFinite(value)) {
-            ratios[key] = 'N/A';
-          } else if (typeof value === 'number') {
-            ratios[key] = Number(value.toFixed(2));
-          }
-        }
-        
-        return ratios;
-      } catch (error) {
-        console.error('Erreur calculateRatios:', error);
-        throw new Error('Calcul des ratios impossible');
-      }
-    }
-    
-    function calculateFairValues(ratios, currentPrice) {
-      try {
-        if (!currentPrice) return null;
-        
-        const fairValues = {};
-        const validValues = [];
-        
-        // Calcul des justes valeurs pour chaque ratio valide
-        if (ratios['PER (moyenne)'] !== 'N/A' && ratios['PER (actuel)'] !== 'N/A') {
-          fairValues['Juste valeur (PER)'] = (ratios['PER (moyenne)'] / ratios['PER (actuel)']) * currentPrice;
-          validValues.push(fairValues['Juste valeur (PER)']);
-        }
-        
-        if (ratios['PBR (moyenne)'] !== 'N/A' && ratios['PBR (actuel)'] !== 'N/A') {
-          fairValues['Juste valeur (PBR)'] = (ratios['PBR (moyenne)'] / ratios['PBR (actuel)']) * currentPrice;
-          validValues.push(fairValues['Juste valeur (PBR)']);
-        }
-        
-        if (ratios['PSR (moyenne)'] !== 'N/A' && ratios['PSR (actuel)'] !== 'N/A') {
-          fairValues['Juste valeur (PSR)'] = (ratios['PSR (moyenne)'] / ratios['PSR (actuel)']) * currentPrice;
-          validValues.push(fairValues['Juste valeur (PSR)']);
-        }
-        
-        if (ratios['PCF (moyenne)'] !== 'N/A') {
-          // Pour PCF, on suppose que le ratio actuel est le prix actuel / cash flow actuel
-          const currentPCF = currentPrice / (ratios['PCF (moyenne)']);
-          fairValues['Juste valeur (PCF)'] = (ratios['PCF (moyenne)'] / currentPCF) * currentPrice;
-          validValues.push(fairValues['Juste valeur (PCF)']);
-        }
-        
-        // Calcul de la moyenne des justes valeurs
-        if (validValues.length > 0) {
-          const moyenne = validValues.reduce((a, b) => a + b, 0) / validValues.length;
-          fairValues['Moyenne juste valeur'] = Number(moyenne.toFixed(2));
-          fairValues['Potentiel (%)'] = Number((((moyenne - currentPrice) / currentPrice) * 100).toFixed(2));
-        }
-        
-        return fairValues;
-      } catch (error) {
-        console.error('Erreur calculateFairValues:', error);
-        return null;
-      }
+      // Potentiel d'investissement
+     //if (statistics.financialData?.targetMeanPrice) {
+     //  const targetPrice = statistics.financialData.targetMeanPrice;
+     //  const potential = ((targetPrice - currentPrice) / currentPrice) * 100;
+     //  
+     //  plotGaugeChart(potential);
+     //  
+     //  resultsDiv.innerHTML += `
+     //    <div class="section">
+     //      <h2>📊 Analyse de Potentiel</h2>
+     //      <p>Prix cible moyen: $${targetPrice.toFixed(2)}</p>
+     //      <p>Potentiel: ${potential.toFixed(2)}%</p>
+     //    </div>
+     //  `;
+     //}
     }
     
     // ==================== Fonction Principale ====================
     
     async function getAllStockData() {
       const symbol = document.getElementById('symbol').value.trim().toUpperCase();
-      if (!symbol) return alert("Veuillez saisir un symbole boursier (ex: AAPL)");
+      if (!symbol) return alert("Veuillez saisir un symbole boursier");
       
       // Réinitialisation
       const resultsDiv = document.getElementById('results');
@@ -627,60 +388,18 @@
       fetchBtn.textContent = 'Chargement...';
       
       try {
-        // Appels API parallèles
-        const [financials, chartData, keyStats] = await Promise.all([
-          fetchYahooData(symbol),
-          fetchYahooChart(symbol),
-          fetchYahooKeyStats(symbol).catch(e => {
-            console.warn('Erreur keyStats, continuation sans ces données', e);
-            return null;
-          })
+        // Appels API en parallèle
+        const [chartData, statistics] = await Promise.all([
+          fetchStockChart(symbol),
+          fetchStockStatistics(symbol)
         ]);
         
-        // Extraction des données
-        const chart = chartData.chart.result[0];
-        const timestamps = chart.timestamp;
-        const closePrices = chart.indicators.quote[0].close;
-        const currentPrice = closePrices[closePrices.length - 1];
+        // Récupération du prix actuel
+        const currentPrice = chartData.meta.regularMarketPrice;
         
-        // Traçage du graphique de prix
-        plotPriceChart(timestamps, closePrices, symbol);
-        
-        // Extraction des données financières
-        const financialData = extractFinancialData(financials, keyStats);
-        financialData.currentPrice = currentPrice; // Mise à jour avec le prix réel
-        
-        // Affichage des données financières
-        displayFinancialTable('📊 Revenus annuels (en milliards $)', financialData.revenue);
-        displayFinancialTable('💰 Bénéfices nets annuels (en milliards $)', financialData.netIncome);
-        displayFinancialTable('💵 Cash-flow opérationnel annuel (en milliards $)', financialData.operatingCashflow);
-        
-        // Calcul des ratios
-        const ratios = calculateRatios(financialData, closePrices);
-        
-        // Calcul des justes valeurs
-        const fairValues = calculateFairValues(ratios, currentPrice);
-        
-        // Affichage des résultats
-        resultsDiv.innerHTML = '';
-        
-        // Cartes de ratios
-        displayRatioCards({
-          'Prix actuel': `${currentPrice.toFixed(2)} $`,
-          'PER': ratios['PER (actuel)'] !== 'N/A' ? ratios['PER (actuel)'] : 'N/A',
-          'PBR': ratios['PBR (actuel)'] !== 'N/A' ? ratios['PBR (actuel)'] : 'N/A',
-          'PSR': ratios['PSR (actuel)'] !== 'N/A' ? ratios['PSR (actuel)'] : 'N/A',
-          'Actions': (financialData.sharesOutstanding / 1e9).toFixed(2) + ' Md'
-        });
-        
-        // Justes valeurs
-        if (fairValues) {
-          displaySection('📊 Justes valeurs estimées', fairValues, true);
-          plotGaugeChart(fairValues['Potentiel (%)'] || 0);
-        }
-        
-        // Ratios détaillés
-        displaySection('📈 Ratios calculés', ratios);
+        // Affichage des données
+        plotPriceChart(chartData, symbol);
+        displayStockInfo(symbol, statistics, currentPrice);
         
       } catch (error) {
         console.error('Erreur principale:', error);
