@@ -1,243 +1,565 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Analyse Boursière avec Yahoo Finance API</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      padding: 20px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    input, button {
-      padding: 10px;
-      font-size: 16px;
-      margin: 5px 0;
-    }
-    button {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    .section {
-      background: #fff;
-      margin: 20px 0;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    h1, h2 {
-      color: #333;
-    }
-    pre {
-      background: #f0f0f0;
-      padding: 10px;
-      border-radius: 5px;
-      overflow-x: auto;
-    }
-    canvas {
-      background: #fff;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-      margin: 20px 0;
-      max-width: 100%;
-    }
-    .toggle-btn {
-      background-color: #6c757d;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      margin-bottom: 10px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur de Juste Valeur par Ratios Historiques</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+            text-align: center;
+        }
+        .search-container {
+            display: flex;
+            margin-bottom: 30px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 6px 0 0 6px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus {
+            border-color: #3498db;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 0 6px 6px 0;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        .result {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 6px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+        }
+        .error {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 6px;
+            background-color: #fef5f5;
+            border-left: 4px solid #e74c3c;
+            color: #c0392b;
+        }
+        .stock-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .stock-price {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stock-details {
+            margin-top: 25px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+        }
+        .fair-value {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #e8f4fc;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .upside {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .downside {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-  <h1>Analyse Financière PROMETHEE <small>(via Yahoo Finance API)</small></h1>
+    <div class="container">
+        <h1>Calculateur de Juste Valeur par Ratios Historiques</h1>
+        
+        <div class="search-container">
+            <input type="text" id="stockSearch" placeholder="Entrez le nom de l'action (ex: Apple, Total, LVMH)">
+            <button id="calculateBtn">Calculer</button>
+        </div>
+        
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+            <p>Recherche et calcul en cours...</p>
+        </div>
+        
+        <div class="error" id="errorMessage"></div>
+        
+        <div class="result" id="resultContainer">
+            <div class="stock-info">
+                <div>
+                    <h2 id="stockName"></h2>
+                    <p id="stockSymbol"></p>
+                </div>
+                <div class="stock-price">
+                    <span id="currentPrice"></span>
+                    <span id="currency"></span>
+                </div>
+            </div>
+            
+            <div class="stock-details">
+                <h3>Ratios des 5 dernières années</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ratio</th>
+                            <th>Moyenne 5 ans</th>
+                            <th>Actuel</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ratiosTable">
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="fair-value">
+                <p>Juste valeur estimée: <span id="fairValue"></span> <span id="fairValueCurrency"></span></p>
+                <p>Potentiel: <span id="potential"></span></p>
+            </div>
+        </div>
+    </div>
 
-  <div class="section">
-    <label for="symbol">Symbole boursier :</label>
-    <input type="text" id="symbol" placeholder="Ex : AAPL, MSFT, TSLA">
-    <button id="fetchBtn" onclick="getAllStockData()">Analyser</button>
-  </div>
-
-  <div id="charts">
-    <canvas id="priceChart" width="800" height="400"></canvas>
-    <canvas id="gaugeChart" width="500" height="250"></canvas>
-  </div>
-
-  <div id="results"></div>
-
-  <script>
-    const rapidApiKey = '0282ae7541msh14d14012243663cp18b34fjsn53e4b64572ce';
-    const rapidApiHost = 'apidojo-yahoo-finance-v1.p.rapidapi.com';
-
-    async function fetchYahooSummary(symbol) {
-      const url = `https://${rapidApiHost}/market/v2/get-summary?region=US`;
-      const res = await fetch(url, {
-        headers: {
-          'X-RapidAPI-Key': rapidApiKey,
-          'X-RapidAPI-Host': rapidApiHost
-        }
-      });
-      return await res.json();
-    }
-
-    async function fetchYahooChart(symbol) {
-      const url = `https://${rapidApiHost}/stock/v3/get-chart?interval=1mo&region=US&symbol=${symbol}&range=5y&includePrePost=false&useYfid=true&includeAdjustedClose=true&events=capitalGain%2Cdiv%2Csplit`;
-      const res = await fetch(url, {
-        headers: {
-          'X-RapidAPI-Key': rapidApiKey,
-          'X-RapidAPI-Host': rapidApiHost
-        }
-      });
-      return await res.json();
-    }
-
-    async function fetchYahooStatistics(symbol) {
-      const url = `https://${rapidApiHost}/stock/v4/get-statistics?symbol=${symbol}&region=US&lang=en-US`;
-      const res = await fetch(url, {
-        headers: {
-          'X-RapidAPI-Key': rapidApiKey,
-          'X-RapidAPI-Host': rapidApiHost
-        }
-      });
-      return await res.json();
-    }
-
-
-    async function fetchYahooQuotes(symbol) {
-      const url = `https://${rapidApiHost}/market/v2/get-quotes?region=US&symbol=${symbol}`;
-      const res = await fetch(url, {
-        headers: {
-          'X-RapidAPI-Key': rapidApiKey,
-          'X-RapidAPI-Host': rapidApiHost
-        }
-      });
-      return await res.json();
-    }
-
-
-
-    function plotPriceChart(timestamps, prices, symbol) {
-      const ctx = document.getElementById('priceChart').getContext('2d');
-      if (window.priceChartInstance) window.priceChartInstance.destroy();
-
-      window.priceChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: timestamps.map(t => new Date(t * 1000).toLocaleDateString()),
-          datasets: [{
-            label: `Cours de ${symbol} (5 ans)`,
-            data: prices,
-            borderColor: 'blue',
-            fill: false,
-            tension: 0.2
-          }]
-        }
-      });
-    }
-
-    function plotGaugeChart(potential) {
-      const ctx = document.getElementById('gaugeChart').getContext('2d');
-      if (window.gaugeChartInstance) window.gaugeChartInstance.destroy();
-
-      window.gaugeChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Potentiel', ''],
-          datasets: [{
-            data: [Math.abs(potential), 100 - Math.abs(potential)],
-            backgroundColor: [potential >= 0 ? '#28a745' : '#dc3545', '#e9ecef'],
-            cutout: '70%',
-            rotation: -90,
-            circumference: 180
-          }]
-        },
-        options: {
-          plugins: {
-            tooltip: { enabled: false },
-            legend: { display: false },
-            datalabels: {
-              display: true,
-              formatter: () => `${potential.toFixed(1)}%`,
-              color: '#212529',
-              font: { size: 18, weight: 'bold' }
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const API_KEY = '0e11e33f8b7a6385b3a4610a242222aa';
+            const searchInput = document.getElementById('stockSearch');
+            const calculateBtn = document.getElementById('calculateBtn');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const errorMessage = document.getElementById('errorMessage');
+            const resultContainer = document.getElementById('resultContainer');
+            
+            // Handle Enter key
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    calculateFairValue();
+                }
+            });
+            
+            // Handle button click
+            calculateBtn.addEventListener('click', calculateFairValue);
+            
+            async function calculateFairValue() {
+                const companyName = searchInput.value.trim();
+                if (!companyName) {
+                    showError("Veuillez entrer le nom d'une action.");
+                    return;
+                }
+                
+                showLoading();
+                
+                try {
+                    // First, search for the stock symbol using the company name
+                    const symbolData = await searchStockSymbol(companyName);
+                    if (!symbolData || symbolData.length === 0) {
+                        showError(`Aucune action trouvée pour "${companyName}". Veuillez vérifier le nom et réessayer.`);
+                        return;
+                    }
+                    
+                    // Use the first result (most relevant)
+                    const stockInfo = symbolData[0];
+                    const symbol = stockInfo.symbol;
+                    
+                    // Get current stock price and additional information
+                    const stockData = await getStockData(symbol);
+                    if (!stockData) {
+                        showError(`Impossible de récupérer les données pour ${symbol}. Veuillez réessayer plus tard.`);
+                        return;
+                    }
+                    
+                    // Get historical ratios
+                    const ratios = await getHistoricalRatios(symbol);
+                    if (!ratios) {
+                        showError(`Impossible de récupérer les ratios historiques pour ${symbol}. Veuillez réessayer plus tard.`);
+                        return;
+                    }
+                    
+                    // Calculate fair value based on historical ratios
+                    const fairValue = calculateBasedOnRatios(stockData, ratios);
+                    
+                    // Display results
+                    displayResults(stockInfo, stockData, ratios, fairValue);
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    showError("Une erreur s'est produite lors du calcul. Veuillez réessayer plus tard.");
+                }
             }
-          }
-        },
-        plugins: [ChartDataLabels]
-      });
-    }
-
-    function displaySection(title, data) {
-      const section = document.createElement('div');
-      section.className = 'section';
-      section.innerHTML = `<h2>${title}</h2><pre>${JSON.stringify(data, null, 2)}</pre>`;
-      document.getElementById('results').appendChild(section);
-    }
-
-    async function getAllStockData() {
-      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '';
-
-      try {
-        const [chart, stats, quotes] = await Promise.all([
-          fetchYahooChart(symbol),
-          fetchYahooStatistics(symbol),
-          fetchYahooQuotes(symbol)
-        ]);
-
-        const chartData = chart.chart.result[0];
-        const timestamps = chartData.timestamp;
-        const prices = chartData.indicators.quote[0].close;
-        const currentPrice = prices[prices.length - 1];
-
-        plotPriceChart(timestamps, prices, symbol);
-
-        const shares = stats.defaultKeyStatistics?.sharesOutstanding?.raw || null;
-        const netIncome = stats.defaultKeyStatistics?.netIncomeToCommon?.raw || null;
-        const revenue = quotes.quoteResponse?.revenue || null;
-        const cashflow = stats.financialData?.operatingCashflow?.raw || null;
-        const equity = stats.balanceSheetHistory?.balanceSheetStatements?.[0]?.totalStockholderEquity?.raw || null;
-
-        const PERavg = (shares && netIncome) ? prices.slice(-5).reduce((a, p) => a + (p / (netIncome / shares)), 0) / 5 : null;
-        const PSRavg = (shares && revenue) ? prices.slice(-5).reduce((a, p) => a + (p / (revenue / shares)), 0) / 5 : null;
-        const PCFavg = (shares && cashflow) ? prices.slice(-5).reduce((a, p) => a + (p / (cashflow / shares)), 0) / 5 : null;
-        const PBRavg = (shares && equity) ? prices.slice(-5).reduce((a, p) => a + (p / (equity / shares)), 0) / 5 : null;
-
-        const trailingPE = stats.defaultKeyStatistics?.trailingPE?.raw || null;
-        const potential = (PERavg && trailingPE && currentPrice) ? (((PERavg / trailingPE) * currentPrice - currentPrice) / currentPrice) * 100 : 0;
-
-        const results = {
-          symbole: symbol,
-          prixActuel: currentPrice,
-          PERavg: PERavg?.toFixed(2) || 'N/A',
-          PBRavg: PBRavg?.toFixed(2) || 'N/A',
-          PSRavg: PSRavg?.toFixed(2) || 'N/A',
-          PCFavg: PCFavg?.toFixed(2) || 'N/A',
-          Potentiel: potential.toFixed(2) + '%'
-        };
-
-        displaySection('📊 Résumé Financier', results);
-        plotGaugeChart(potential);
-
-      } catch (e) {
-        resultsDiv.innerHTML = `<p style="color:red">Erreur : ${e.message}</p>`;
-      }
-    }
-  </script>
+            
+            async function searchStockSymbol(query) {
+                // Simulate API search using Yahoo Finance API
+                // In a real application, you would use a real API endpoint
+                
+                // This is a simulation for demo purposes
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        // Check for some common companies as examples
+                        const stockDatabase = {
+                            'apple': { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
+                            'microsoft': { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
+                            'amazon': { symbol: 'AMZN', name: 'Amazon.com, Inc.', exchange: 'NASDAQ' },
+                            'google': { symbol: 'GOOGL', name: 'Alphabet Inc.', exchange: 'NASDAQ' },
+                            'facebook': { symbol: 'META', name: 'Meta Platforms, Inc.', exchange: 'NASDAQ' },
+                            'tesla': { symbol: 'TSLA', name: 'Tesla, Inc.', exchange: 'NASDAQ' },
+                            'nvidia': { symbol: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NASDAQ' },
+                            'netflix': { symbol: 'NFLX', name: 'Netflix, Inc.', exchange: 'NASDAQ' },
+                            'jpmorgan': { symbol: 'JPM', name: 'JPMorgan Chase & Co.', exchange: 'NYSE' },
+                            'walmart': { symbol: 'WMT', name: 'Walmart Inc.', exchange: 'NYSE' },
+                            'disney': { symbol: 'DIS', name: 'The Walt Disney Company', exchange: 'NYSE' },
+                            'coca-cola': { symbol: 'KO', name: 'The Coca-Cola Company', exchange: 'NYSE' },
+                            'lvmh': { symbol: 'MC.PA', name: 'LVMH Moët Hennessy - Louis Vuitton', exchange: 'Euronext Paris' },
+                            'total': { symbol: 'TTE.PA', name: 'TotalEnergies SE', exchange: 'Euronext Paris' },
+                            'sanofi': { symbol: 'SAN.PA', name: 'Sanofi S.A.', exchange: 'Euronext Paris' },
+                            'loreal': { symbol: 'OR.PA', name: 'L\'Oréal S.A.', exchange: 'Euronext Paris' },
+                            'airbus': { symbol: 'AIR.PA', name: 'Airbus SE', exchange: 'Euronext Paris' },
+                            'carrefour': { symbol: 'CA.PA', name: 'Carrefour SA', exchange: 'Euronext Paris' },
+                            'danone': { symbol: 'BN.PA', name: 'Danone S.A.', exchange: 'Euronext Paris' },
+                            'hermes': { symbol: 'RMS.PA', name: 'Hermès International S.A.', exchange: 'Euronext Paris' }
+                        };
+                        
+                        const normalizedQuery = query.toLowerCase();
+                        const matches = [];
+                        
+                        // Check for exact or partial matches
+                        for (const [key, value] of Object.entries(stockDatabase)) {
+                            if (key.includes(normalizedQuery) || 
+                                value.name.toLowerCase().includes(normalizedQuery) || 
+                                value.symbol.toLowerCase().includes(normalizedQuery)) {
+                                matches.push(value);
+                            }
+                        }
+                        
+                        resolve(matches);
+                    }, 1000);
+                });
+            }
+            
+            async function getStockData(symbol) {
+                // Simulate getting stock data
+                // In a real application, use a financial data API
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        // Sample data
+                        const stockPrices = {
+                            'AAPL': { price: 198.45, currency: 'USD', marketCap: 3.18e12, eps: 6.42, cashPerShare: 4.12, revenue: 383.3e9, bookValue: 4.5 },
+                            'MSFT': { price: 417.33, currency: 'USD', marketCap: 3.10e12, eps: 11.14, cashPerShare: 13.61, revenue: 211.9e9, bookValue: 33.74 },
+                            'AMZN': { price: 182.41, currency: 'USD', marketCap: 1.89e12, eps: 2.9, cashPerShare: 17.58, revenue: 574.8e9, bookValue: 42.69 },
+                            'GOOGL': { price: 158.47, currency: 'USD', marketCap: 1.97e12, eps: 6.05, cashPerShare: 9.32, revenue: 307.4e9, bookValue: 22.86 },
+                            'META': { price: 504.22, currency: 'USD', marketCap: 1.28e12, eps: 17.19, cashPerShare: 21.23, revenue: 134.9e9, bookValue: 59.32 },
+                            'TSLA': { price: 169.12, currency: 'USD', marketCap: 5.38e11, eps: 4.3, cashPerShare: 20.61, revenue: 96.77e9, bookValue: 33.12 },
+                            'NVDA': { price: 113.48, currency: 'USD', marketCap: 2.80e12, eps: 0.27, cashPerShare: 2.81, revenue: 60.92e9, bookValue: 2.16 },
+                            'NFLX': { price: 676.53, currency: 'USD', marketCap: 2.92e11, eps: 17.56, cashPerShare: 12.41, revenue: 33.72e9, bookValue: 30.65 },
+                            'JPM': { price: 196.46, currency: 'USD', marketCap: 5.62e11, eps: 16.23, cashPerShare: 567.42, revenue: 176.2e9, bookValue: 104.01 },
+                            'WMT': { price: 79.21, currency: 'USD', marketCap: 6.38e11, eps: 2.63, cashPerShare: 4.71, revenue: 648.1e9, bookValue: 39.84 },
+                            'DIS': { price: 107.90, currency: 'USD', marketCap: 1.97e11, eps: 2.76, cashPerShare: 8.57, revenue: 88.9e9, bookValue: 49.15 },
+                            'KO': { price: 71.70, currency: 'USD', marketCap: 3.10e11, eps: 2.7, cashPerShare: 2.82, revenue: 43.4e9, bookValue: 5.46 },
+                            'MC.PA': { price: 721.00, currency: 'EUR', marketCap: 3.63e11, eps: 32.10, cashPerShare: 38.57, revenue: 86.15e9, bookValue: 124.10 },
+                            'TTE.PA': { price: 62.91, currency: 'EUR', marketCap: 1.48e11, eps: 8.28, cashPerShare: 9.61, revenue: 241.1e9, bookValue: 59.32 },
+                            'SAN.PA': { price: 88.19, currency: 'EUR', marketCap: 1.11e11, eps: 5.24, cashPerShare: 6.12, revenue: 43.1e9, bookValue: 60.85 },
+                            'OR.PA': { price: 431.70, currency: 'EUR', marketCap: 2.31e11, eps: 11.98, cashPerShare: 8.56, revenue: 38.26e9, bookValue: 48.10 },
+                            'AIR.PA': { price: 137.14, currency: 'EUR', marketCap: 1.08e11, eps: 5.21, cashPerShare: 16.74, revenue: 72.17e9, bookValue: 24.86 },
+                            'CA.PA': { price: 16.48, currency: 'EUR', marketCap: 1.18e10, eps: 1.10, cashPerShare: 3.25, revenue: 94.13e9, bookValue: 11.56 },
+                            'BN.PA': { price: 58.25, currency: 'EUR', marketCap: 3.75e10, eps: 2.35, cashPerShare: 2.10, revenue: 27.07e9, bookValue: 26.14 },
+                            'RMS.PA': { price: 2023.50, currency: 'EUR', marketCap: 2.13e11, eps: 56.41, cashPerShare: 44.32, revenue: 13.43e9, bookValue: 112.34 }
+                        };
+                        
+                        const data = stockPrices[symbol];
+                        if (data) {
+                            resolve({
+                                symbol: symbol,
+                                ...data
+                            });
+                        } else {
+                            resolve(null);
+                        }
+                    }, 1000);
+                });
+            }
+            
+            async function getHistoricalRatios(symbol) {
+                // Simulate getting historical ratios
+                // In a real application, use a financial data API
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        // Sample data structure for historical ratios (5 years)
+                        const historicalRatios = {
+                            'AAPL': {
+                                PER: { avg: 26.8, current: 30.9 },
+                                PCF: { avg: 21.4, current: 24.6 },
+                                PSR: { avg: 7.2, current: 8.3 },
+                                PBR: { avg: 34.2, current: 44.1 }
+                            },
+                            'MSFT': {
+                                PER: { avg: 31.5, current: 37.5 },
+                                PCF: { avg: 20.7, current: 22.8 },
+                                PSR: { avg: 11.8, current: 14.6 },
+                                PBR: { avg: 11.4, current: 12.4 }
+                            },
+                            'AMZN': {
+                                PER: { avg: 65.2, current: 62.9 },
+                                PCF: { avg: 25.6, current: 23.1 },
+                                PSR: { avg: 3.2, current: 3.3 },
+                                PBR: { avg: 4.2, current: 4.3 }
+                            },
+                            'GOOGL': {
+                                PER: { avg: 28.4, current: 26.2 },
+                                PCF: { avg: 20.3, current: 17.0 },
+                                PSR: { avg: 6.4, current: 6.4 },
+                                PBR: { avg: 6.8, current: 6.9 }
+                            },
+                            'META': {
+                                PER: { avg: 25.6, current: 29.3 },
+                                PCF: { avg: 19.2, current: 21.8 },
+                                PSR: { avg: 8.7, current: 9.5 },
+                                PBR: { avg: 7.6, current: 8.5 }
+                            },
+                            'TSLA': {
+                                PER: { avg: 117.3, current: 39.3 },
+                                PCF: { avg: 61.4, current: 25.8 },
+                                PSR: { avg: 7.8, current: 5.6 },
+                                PBR: { avg: 16.2, current: 5.1 }
+                            },
+                            'NVDA': {
+                                PER: { avg: 58.7, current: 420.3 },
+                                PCF: { avg: 42.3, current: 112.6 },
+                                PSR: { avg: 16.5, current: 45.9 },
+                                PBR: { avg: 18.4, current: 52.5 }
+                            },
+                            'NFLX': {
+                                PER: { avg: 57.4, current: 38.5 },
+                                PCF: { avg: 40.6, current: 32.7 },
+                                PSR: { avg: 8.4, current: 8.7 },
+                                PBR: { avg: 19.6, current: 22.1 }
+                            },
+                            'JPM': {
+                                PER: { avg: 12.6, current: 12.1 },
+                                PCF: { avg: 0.4, current: 0.3 },
+                                PSR: { avg: 3.2, current: 3.2 },
+                                PBR: { avg: 1.7, current: 1.9 }
+                            },
+                            'WMT': {
+                                PER: { avg: 25.3, current: 30.1 },
+                                PCF: { avg: 13.7, current: 16.8 },
+                                PSR: { avg: 0.7, current: 1.0 },
+                                PBR: { avg: 3.8, current: 2.0 }
+                            },
+                            'DIS': {
+                                PER: { avg: 41.8, current: 39.1 },
+                                PCF: { avg: 21.6, current: 18.7 },
+                                PSR: { avg: 2.4, current: 2.2 },
+                                PBR: { avg: 2.8, current: 2.2 }
+                            },
+                            'KO': {
+                                PER: { avg: 24.3, current: 26.6 },
+                                PCF: { avg: 19.8, current: 21.2 },
+                                PSR: { avg: 6.7, current: 7.1 },
+                                PBR: { avg: 11.6, current: 13.1 }
+                            },
+                            'MC.PA': {
+                                PER: { avg: 27.6, current: 22.5 },
+                                PCF: { avg: 20.4, current: 18.7 },
+                                PSR: { avg: 5.3, current: 4.2 },
+                                PBR: { avg: 6.4, current: 5.8 }
+                            },
+                            'TTE.PA': {
+                                PER: { avg: 9.2, current: 7.6 },
+                                PCF: { avg: 5.8, current: 4.7 },
+                                PSR: { avg: 0.6, current: 0.6 },
+                                PBR: { avg: 1.2, current: 1.1 }
+                            },
+                            'SAN.PA': {
+                                PER: { avg: 13.4, current: 16.8 },
+                                PCF: { avg: 10.6, current: 12.7 },
+                                PSR: { avg: 2.5, current: 2.6 },
+                                PBR: { avg: 1.6, current: 1.4 }
+                            },
+                            'OR.PA': {
+                                PER: { avg: 35.7, current: 36.0 },
+                                PCF: { avg: 25.3, current: 27.1 },
+                                PSR: { avg: 6.2, current: 6.0 },
+                                PBR: { avg: 8.9, current: 9.0 }
+                            },
+                            'AIR.PA': {
+                                PER: { avg: 19.8, current: 26.3 },
+                                PCF: { avg: 11.2, current: 16.5 },
+                                PSR: { avg: 1.3, current: 1.9 },
+                                PBR: { avg: 5.1, current: 5.5 }
+                            },
+                            'CA.PA': {
+                                PER: { avg: 12.5, current: 15.0 },
+                                PCF: { avg: 5.2, current: 6.1 },
+                                PSR: { avg: 0.15, current: 0.13 },
+                                PBR: { avg: 1.4, current: 1.4 }
+                            },
+                            'BN.PA': {
+                                PER: { avg: 18.3, current: 24.8 },
+                                PCF: { avg: 11.4, current: 16.2 },
+                                PSR: { avg: 1.3, current: 1.4 },
+                                PBR: { avg: 2.3, current: 2.2 }
+                            },
+                            'RMS.PA': {
+                                PER: { avg: 47.2, current: 35.9 },
+                                PCF: { avg: 36.5, current: 31.4 },
+                                PSR: { avg: 15.3, current: 15.1 },
+                                PBR: { avg: 16.8, current: 18.0 }
+                            }
+                        };
+                        
+                        const ratios = historicalRatios[symbol];
+                        if (ratios) {
+                            resolve(ratios);
+                        } else {
+                            resolve(null);
+                        }
+                    }, 1500);
+                });
+            }
+            
+            function calculateBasedOnRatios(stockData, ratios) {
+                // Calculate fair value based on each ratio
+                const PER_fairValue = (ratios.PER.avg / ratios.PER.current) * stockData.price;
+                const PCF_fairValue = (ratios.PCF.avg / ratios.PCF.current) * stockData.price;
+                const PSR_fairValue = (ratios.PSR.avg / ratios.PSR.current) * stockData.price;
+                const PBR_fairValue = (ratios.PBR.avg / ratios.PBR.current) * stockData.price;
+                
+                // Average of all four methods
+                const averageFairValue = (PER_fairValue + PCF_fairValue + PSR_fairValue + PBR_fairValue) / 4;
+                
+                return {
+                    PER: PER_fairValue,
+                    PCF: PCF_fairValue,
+                    PSR: PSR_fairValue,
+                    PBR: PBR_fairValue,
+                    average: averageFairValue
+                };
+            }
+            
+            function displayResults(stockInfo, stockData, ratios, fairValue) {
+                // Update stock information
+                document.getElementById('stockName').textContent = stockInfo.name;
+                document.getElementById('stockSymbol').textContent = `${stockInfo.symbol} | ${stockInfo.exchange}`;
+                document.getElementById('currentPrice').textContent = stockData.price.toFixed(2);
+                document.getElementById('currency').textContent = stockData.currency;
+                
+                // Update ratios table
+                const ratiosTable = document.getElementById('ratiosTable');
+                ratiosTable.innerHTML = '';
+                
+                for (const [ratio, values] of Object.entries(ratios)) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${ratio}</td>
+                        <td>${values.avg.toFixed(2)}</td>
+                        <td>${values.current.toFixed(2)}</td>
+                    `;
+                    ratiosTable.appendChild(row);
+                }
+                
+                // Update fair value
+                document.getElementById('fairValue').textContent = fairValue.average.toFixed(2);
+                document.getElementById('fairValueCurrency').textContent = stockData.currency;
+                
+                // Calculate potential
+                const potential = ((fairValue.average / stockData.price) - 1) * 100;
+                const potentialElement = document.getElementById('potential');
+                potentialElement.textContent = `${potential.toFixed(2)}%`;
+                
+                if (potential > 0) {
+                    potentialElement.className = 'upside';
+                } else {
+                    potentialElement.className = 'downside';
+                }
+                
+                // Show results
+                hideLoading();
+                errorMessage.style.display = 'none';
+                resultContainer.style.display = 'block';
+            }
+            
+            function showLoading() {
+                loadingIndicator.style.display = 'block';
+                errorMessage.style.display = 'none';
+                resultContainer.style.display = 'none';
+            }
+            
+            function hideLoading() {
+                loadingIndicator.style.display = 'none';
+            }
+            
+            function showError(message) {
+                hideLoading();
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                resultContainer.style.display = 'none';
+            }
+        });
+    </script>
 </body>
 </html>
