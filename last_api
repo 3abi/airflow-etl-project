@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Analyse Boursière - Version Complète</title>
+  <title>PROMETHEE — Ratios Financiers Fiables</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial; background: #f4f4f4; padding: 20px; }
@@ -14,7 +14,7 @@
   </style>
 </head>
 <body>
-  <h1>🔍 PROMETHEE — Analyse Financière</h1>
+  <h1>📊 PROMETHEE — Analyse Financière Fiable (Yahoo Finance)</h1>
 
   <label for="symbol">Symbole boursier :</label><br>
   <input type="text" id="symbol" placeholder="Ex : AAPL"><br>
@@ -27,7 +27,7 @@
   <div id="symbolSelector" style="display:none;"></div>
 
   <div class="section">
-    <button id="toggleChartBtn" class="toggle-btn" onclick="toggleChart()">Afficher/Masquer le graphique</button>
+    <button class="toggle-btn" onclick="toggleChart()">Afficher/Masquer le graphique</button>
     <div id="chartContainer">
       <canvas id="priceChart" width="800" height="400"></canvas>
     </div>
@@ -45,85 +45,71 @@
       try {
         return JSON.parse(text);
       } catch {
-        throw new Error("❌ Réponse non valide reçue depuis l’API.");
+        throw new Error("Réponse non valide de l’API.");
       }
     }
 
     async function startLookup() {
-      const symbolInput = document.getElementById('symbol').value.trim().toUpperCase();
-      const companyInput = document.getElementById('companyName').value.trim();
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '';
+      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+      const name = document.getElementById('companyName').value.trim();
+      const result = document.getElementById('results');
+      result.innerHTML = '';
       if (currentChart) currentChart.destroy();
       document.getElementById('symbolSelector').style.display = 'none';
 
-      if (symbolInput) {
-        getAllStockData(symbolInput);
-        return;
-      }
+      if (symbol) return getAllStockData(symbol);
 
-      if (companyInput) {
-        const url = `https://yfapi.net/v6/finance/autocomplete?query=${encodeURIComponent(companyInput)}&lang=fr`;
-        let data;
-        try {
-          data = await safeFetchJson(url, {
-            headers: { 'x-api-key': API_KEY }
-          });
-        } catch (err) {
-          resultsDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
-          return;
-        }
-
+      if (name) {
+        const url = `https://yfapi.net/v6/finance/autocomplete?query=${encodeURIComponent(name)}&lang=fr`;
+        let data = await safeFetchJson(url, { headers: { 'x-api-key': API_KEY } });
         const results = data?.ResultSet?.Result;
         if (!results || results.length === 0) {
-          resultsDiv.innerHTML = `<p style="color:red">❌ Aucun symbole trouvé pour "${companyInput}".</p>`;
+          result.innerHTML = `<p style="color:red">Aucun résultat trouvé pour "${name}".</p>`;
           return;
         }
 
-        const selector = document.createElement('select');
-        selector.id = "symbolChoice";
-        selector.innerHTML = results.map(r =>
+        const select = document.createElement('select');
+        select.id = "symbolChoice";
+        select.innerHTML = results.map(r =>
           `<option value="${r.symbol}">${r.symbol} - ${r.name} (${r.exchDisp})</option>`
         ).join('');
 
-        const validateBtn = document.createElement('button');
-        validateBtn.textContent = 'Choisir ce symbole';
-        validateBtn.onclick = () => {
+        const btn = document.createElement('button');
+        btn.textContent = 'Choisir ce symbole';
+        btn.onclick = () => {
           const selected = document.getElementById('symbolChoice').value;
           document.getElementById('symbolSelector').style.display = 'none';
           getAllStockData(selected);
         };
 
         const container = document.getElementById('symbolSelector');
-        container.innerHTML = '<h3>Plusieurs résultats trouvés :</h3>';
-        container.appendChild(selector);
+        container.innerHTML = '<h3>Résultats trouvés :</h3>';
+        container.appendChild(select);
         container.appendChild(document.createElement('br'));
-        container.appendChild(validateBtn);
+        container.appendChild(btn);
         container.style.display = 'block';
       }
     }
 
     async function getAllStockData(symbol) {
       const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '<p>Chargement...</p>';
+      resultsDiv.innerHTML = '<p>Chargement des données...</p>';
       const ctx = document.getElementById('priceChart').getContext('2d');
       if (currentChart) currentChart.destroy();
 
       try {
-        const [quoteData, chartData] = await Promise.all([
-          safeFetchJson(`https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=price,summaryDetail,financialData,defaultKeyStatistics,calendarEvents,earnings,quoteType`, {
-            headers: { 'x-api-key': API_KEY }
-          }),
-          safeFetchJson(`https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo&region=US`, {
-            headers: { 'x-api-key': API_KEY }
-          })
-        ]);
+        const quoteData = await safeFetchJson(`https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=price,summaryDetail,financialData,defaultKeyStatistics,incomeStatementHistory,balanceSheetHistory,cashflowStatementHistory`, {
+          headers: { 'x-api-key': API_KEY }
+        });
+
+        const chartData = await safeFetchJson(`https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo`, {
+          headers: { 'x-api-key': API_KEY }
+        });
 
         const quote = quoteData?.quoteSummary?.result?.[0];
         const timestamps = chartData?.chart?.result?.[0]?.timestamp;
         const prices = chartData?.chart?.result?.[0]?.indicators?.adjclose?.[0]?.adjclose;
-
-        if (!quote || !timestamps || !prices) throw new Error("❌ Données incomplètes ou indisponibles pour ce symbole.");
+        if (!quote || !timestamps || !prices) throw new Error("Données insuffisantes.");
 
         const historicalPrices = timestamps.map((t, i) => ({
           date: new Date(t * 1000).toISOString().split('T')[0],
@@ -132,27 +118,73 @@
 
         resultsDiv.innerHTML = '';
 
+        const shares = quote.defaultKeyStatistics?.sharesOutstanding?.raw || null;
+        const income = quote.incomeStatementHistory?.incomeStatementHistory || [];
+        const balance = quote.balanceSheetHistory?.balanceSheetStatements || [];
+        const cashflow = quote.cashflowStatementHistory?.cashflowStatements || [];
+        const priceCurrent = quote.price?.regularMarketPrice?.raw || null;
+
+        const perList = [], pbrList = [], pcfList = [];
+        const years = Math.min(income.length, balance.length, cashflow.length, historicalPrices.length);
+
+        for (let i = 0; i < years; i++) {
+          const net = income[i]?.netIncome?.raw;
+          const equity = balance[i]?.totalStockholderEquity?.raw;
+          const operatingCashFlow = cashflow[i]?.totalCashFromOperatingActivities?.raw;
+          const price = historicalPrices[historicalPrices.length - 1 - i]?.close;
+          if (shares && net && price) perList.push(price / (net / shares));
+          if (shares && equity && price) pbrList.push(price / (equity / shares));
+          if (shares && operatingCashFlow && price) pcfList.push(price / (operatingCashFlow / shares));
+        }
+
+        const perAvg = perList.length ? perList.reduce((a,b)=>a+b)/perList.length : null;
+        const pbrAvg = pbrList.length ? pbrList.reduce((a,b)=>a+b)/pbrList.length : null;
+        const pcfAvg = pcfList.length ? pcfList.reduce((a,b)=>a+b)/pcfList.length : null;
+
+        const perNow = quote.summaryDetail?.trailingPE?.raw;
+        const pbrNow = quote.defaultKeyStatistics?.priceToBook?.raw;
+        const pcfNow = quote.defaultKeyStatistics?.priceToCashFlow?.raw;
+        const psrNow = quote.summaryDetail?.priceToSalesTrailing12Months?.raw;
+
+        const fairValues = {
+          PER: perAvg && perNow ? (perAvg / perNow) * priceCurrent : null,
+          PCF: pcfAvg && pcfNow ? (pcfAvg / pcfNow) * priceCurrent : null,
+          PSR: psrNow ? priceCurrent : null,
+          PBR: pbrAvg && pbrNow ? (pbrAvg / pbrNow) * priceCurrent : null
+        };
+
+        const fairList = Object.values(fairValues).filter(v => typeof v === 'number');
+        const fairAvg = fairList.length ? fairList.reduce((a,b)=>a+b)/fairList.length : null;
+        const upside = fairAvg && priceCurrent ? ((fairAvg / priceCurrent - 1) * 100) : null;
+        const formatVal = v => typeof v === 'number' ? v.toFixed(2) : 'N/A';
+
         displaySection('📊 Données Générales', {
           symbole: symbol,
           nom: quote.price?.longName || "N/A",
           exchange: quote.price?.exchangeName || "N/A"
         });
 
-        displaySection('📊 Données Fondamentales', {
-          prixActuel: quote.price?.regularMarketPrice?.raw || "N/A",
-          devise: quote.price?.currency || "N/A",
-          capitalisation: quote.price?.marketCap?.fmt || "N/A",
-          tresorerieParAction: quote.financialData?.totalCashPerShare?.fmt || "N/A",
-          chiffreAffaires: quote.financialData?.totalRevenue?.fmt || "N/A",
-          valeurComptable: quote.defaultKeyStatistics?.bookValue?.fmt || "N/A"
+        displaySection('📊 Ratios Financiers Actuels', {
+          PER: formatVal(perNow),
+          PCF: formatVal(pcfNow),
+          PSR: formatVal(psrNow),
+          PBR: formatVal(pbrNow)
         });
 
-        displaySection('📊 Ratios Financiers { Actuels }', {
-          PER: quote.summaryDetail?.trailingPE?.fmt || "N/A",
-          PCF: quote.defaultKeyStatistics?.priceToCashFlow?.fmt || "N/A",
-          PSR: quote.summaryDetail?.priceToSalesTrailing12Months?.fmt || "N/A",
-          PBR: quote.defaultKeyStatistics?.priceToBook?.fmt || "N/A"
+        displaySection('📐 Juste Valeur Estimée - Ratios Historiques', {
+          'Juste Valeur (PER)': formatVal(fairValues.PER),
+          'Juste Valeur (PCF)': formatVal(fairValues.PCF),
+          'Juste Valeur (PSR)': formatVal(fairValues.PSR),
+          'Juste Valeur (PBR)': formatVal(fairValues.PBR),
+          'Moyenne': formatVal(fairAvg),
+          'Potentiel (%)': upside !== null ? `${upside.toFixed(2)}%` : 'N/A'
         });
+
+        const couleur = upside > 0 ? 'green' : 'red';
+        const potentiel = document.createElement('div');
+        potentiel.className = 'section';
+        potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
+        resultsDiv.appendChild(potentiel);
 
         currentChart = new Chart(ctx, {
           type: 'line',
@@ -165,52 +197,8 @@
               fill: false,
               tension: 0.1
             }]
-          },
-          options: {
-            responsive: true,
-            scales: {
-              x: { title: { display: true, text: 'Date' }},
-              y: { title: { display: true, text: 'Prix (USD)' }}
-            }
           }
         });
-
-        const earnings = quote.earnings?.earningsChart?.financialsChart?.yearly || [];
-        const earningsValues = earnings.map(e => e.earnings?.raw);
-        const chartPrices = historicalPrices.slice(-earningsValues.length).map(p => p.close);
-        const perList = chartPrices.map((price, i) => earningsValues[i] ? price / earningsValues[i] : null).filter(v => v);
-        const pbrList = chartPrices.map((price, i) => earningsValues[i] ? price / earningsValues[i] : null).filter(v => v);
-
-        const perAvg = perList.length ? perList.reduce((a, b) => a + b, 0) / perList.length : null;
-        const pbrAvg = pbrList.length ? pbrList.reduce((a, b) => a + b, 0) / pbrList.length : null;
-
-        const priceCurrent = quote.price?.regularMarketPrice?.raw || null;
-        const fairValues = {
-          PER: (perAvg && quote.summaryDetail?.trailingPE?.raw) ? (perAvg / quote.summaryDetail.trailingPE.raw) * priceCurrent : null,
-          PCF: quote.defaultKeyStatistics?.priceToCashFlow?.raw ? priceCurrent : null,
-          PSR: quote.summaryDetail?.priceToSalesTrailing12Months?.raw ? priceCurrent : null,
-          PBR: (pbrAvg && quote.defaultKeyStatistics?.priceToBook?.raw) ? (pbrAvg / quote.defaultKeyStatistics.priceToBook.raw) * priceCurrent : null
-        };
-
-        const fairValuesList = Object.values(fairValues).filter(v => typeof v === 'number');
-        const fairAvg = fairValuesList.length ? fairValuesList.reduce((a, b) => a + b, 0) / fairValuesList.length : null;
-        const upside = fairAvg && priceCurrent ? ((fairAvg / priceCurrent - 1) * 100) : null;
-        const couleur = upside > 0 ? 'green' : 'red';
-        const formatVal = v => (typeof v === 'number' && !isNaN(v)) ? v.toFixed(2) : 'N/A';
-
-        displaySection('📐 Juste Valeur Estimée - Ratios Historiques', {
-          'Juste Valeur (PER)': formatVal(fairValues.PER),
-          'Juste Valeur (PCF)': formatVal(fairValues.PCF),
-          'Juste Valeur (PSR)': formatVal(fairValues.PSR),
-          'Juste Valeur (PBR)': formatVal(fairValues.PBR),
-          'Moyenne': formatVal(fairAvg),
-          'Potentiel (%)': upside !== null ? `${upside.toFixed(2)}%` : 'N/A'
-        });
-
-        const potentiel = document.createElement('div');
-        potentiel.className = 'section';
-        potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
-        resultsDiv.appendChild(potentiel);
 
       } catch (err) {
         resultsDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
@@ -229,7 +217,6 @@
 
       const pre = document.createElement('pre');
       pre.textContent = JSON.stringify(obj, null, 2);
-
       btn.onclick = () => {
         pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
       };
