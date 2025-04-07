@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Exploration complète API Boursières</title>
+  <title>Exploration API Boursière - Nom ou Symbole</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -13,6 +13,7 @@
     input, button {
       padding: 8px;
       font-size: 16px;
+      margin: 5px 0;
     }
     .section {
       background: #fff;
@@ -49,9 +50,11 @@
   </style>
 </head>
 <body>
-  <h1>PROMETHEE {based on Yahoo Finance}</h1>
-  <label for="symbol">Symbole boursier :</label>
-  <input type="text" id="symbol" placeholder="Ex : AAPL">
+  <h1>PROMETHEE - Analyse Financière</h1>
+  <label for="symbol">Symbole boursier :</label><br>
+  <input type="text" id="symbol" placeholder="Ex : AAPL"><br>
+  <label for="companyName">Ou nom de l'entreprise :</label><br>
+  <input type="text" id="companyName" placeholder="Ex : Apple"><br>
   <button onclick="getAllStockData()">Obtenir les données</button>
 
   <canvas id="priceChart" width="800" height="400"></canvas>
@@ -60,44 +63,55 @@
   <script>
     const yahooFinanceApiKey = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
 
+    async function resolveSymbol(symbolInput, companyNameInput) {
+      const symbol = symbolInput.trim().toUpperCase();
+      const name = companyNameInput.trim();
+
+      if (symbol) return symbol;
+
+      if (name) {
+        const url = `https://yfapi.net/v6/finance/autocomplete?query=${encodeURIComponent(name)}&lang=fr`;
+
+        const res = await fetch(url, {
+          headers: { 'x-api-key': yahooFinanceApiKey }
+        });
+
+        const data = await res.json();
+        const match = data?.ResultSet?.Result?.[0];
+
+        if (match?.symbol) return match.symbol;
+        else throw new Error("Aucun symbole trouvé pour ce nom d'entreprise.");
+      }
+
+      throw new Error("Veuillez saisir un symbole ou un nom d'entreprise.");
+    }
+
     async function fetchYahooFinanceData(symbol) {
       const modules = [
         "price","summaryDetail","financialData","defaultKeyStatistics",
-        "calendarEvents","earnings","esgScores","assetProfile",
-        "recommendationTrend","upgradeDowngradeHistory","insiderHolders",
-        "insiderTransactions","majorHoldersBreakdown","incomeStatementHistory",
-        "balanceSheetHistory","cashflowStatementHistory","netSharePurchaseActivity",
-        "sectorTrend","quoteType"
+        "calendarEvents","earnings","quoteType"
       ].join(',');
 
       const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=${modules}`;
-
       const response = await fetch(url, {
         headers: { 'x-api-key': yahooFinanceApiKey }
       });
       const json = await response.json();
       if (!json.quoteSummary?.result || !json.quoteSummary.result[0]) {
-        throw new Error(`Symbole non trouvé ou invalide (${symbol})`);
+        throw new Error(`Symbole invalide ou données manquantes pour ${symbol}`);
       }
       return json.quoteSummary.result[0];
     }
 
     async function fetchYahooHistoricalPrices(symbol) {
-      const now = Math.floor(Date.now() / 1000);
-      const fiveYearsAgo = now - 60 * 60 * 24 * 365 * 5;
       const url = `https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo&region=US`;
-
       const response = await fetch(url, {
         headers: { 'x-api-key': yahooFinanceApiKey }
       });
       const json = await response.json();
-
-      if (!json.chart?.result || !json.chart.result[0]?.timestamp) {
-        throw new Error("Erreur récupération historique Yahoo.");
-      }
-
-      const timestamps = json.chart.result[0].timestamp;
-      const prices = json.chart.result[0].indicators?.adjclose?.[0]?.adjclose;
+      const timestamps = json.chart?.result?.[0]?.timestamp;
+      const prices = json.chart?.result?.[0]?.indicators?.adjclose?.[0]?.adjclose;
+      if (!timestamps || !prices) throw new Error("Données historiques non disponibles.");
 
       return timestamps.map((ts, i) => ({
         date: new Date(ts * 1000).toISOString().split('T')[0],
@@ -129,15 +143,16 @@
     }
 
     async function getAllStockData() {
-      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
-      if (!symbol) return alert("Veuillez saisir un symbole.");
-
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = '<p>Chargement...</p>';
       const ctx = document.getElementById('priceChart').getContext('2d');
       ctx.clearRect(0, 0, 800, 400);
 
+      const symbolInput = document.getElementById('symbol').value;
+      const companyNameInput = document.getElementById('companyName').value;
+
       try {
+        const symbol = await resolveSymbol(symbolInput, companyNameInput);
         const [quote, historicalPrices] = await Promise.all([
           fetchYahooFinanceData(symbol),
           fetchYahooHistoricalPrices(symbol)
@@ -171,7 +186,6 @@
         displaySection('📊 Données Fondamentales', fondamentaux);
         displaySection('📊 Ratios Financiers { Actuels }', ratios);
 
-        // Graphique des prix historiques
         new Chart(ctx, {
           type: 'line',
           data: {
@@ -179,7 +193,7 @@
             datasets: [{
               label: `Prix historique (${symbol})`,
               data: historicalPrices.map(p => p.close),
-              borderColor: 'green',
+              borderColor: 'blue',
               fill: false,
               tension: 0.1
             }]
@@ -193,7 +207,6 @@
           }
         });
 
-        // Calcul de juste valeur
         const earnings = quote.earnings?.earningsChart?.financialsChart?.yearly || [];
         const earningsValues = earnings.map(e => e.earnings?.raw);
         const prices = historicalPrices.slice(-earningsValues.length).map(p => p.close);
@@ -220,8 +233,8 @@
         const fairAvg = fairValuesList.length ? fairValuesList.reduce((a, b) => a + b, 0) / fairValuesList.length : null;
         const upside = fairAvg && priceCurrent ? ((fairAvg / priceCurrent - 1) * 100) : null;
         const couleur = upside > 0 ? 'green' : 'red';
-
         const formatVal = v => (typeof v === 'number' && !isNaN(v)) ? v.toFixed(2) : 'N/A';
+
         displaySection('📐 Juste Valeur Estimée - Ratios Historiques', {
           'Juste Valeur (PER)': formatVal(fairValues.PER),
           'Juste Valeur (PCF)': formatVal(fairValues.PCF),
