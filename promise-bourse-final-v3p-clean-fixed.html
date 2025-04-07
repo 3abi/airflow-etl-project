@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>PROMETHEE — Analyse Avancée avec PSR Historique</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+    input, button, select { padding: 8px; font-size: 16px; margin: 5px 0; }
+    .section { background: #fff; margin: 20px 0; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    pre { background: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    canvas { background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0,0,0,0.1); margin: 20px 0; }
+    .toggle-btn { background-color: #007bff; color: white; border: none; padding: 5px 10px; margin-bottom: 10px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>📊 PROMETHEE — Analyse Financière Avancée (Yahoo Finance)</h1>
+
+  <label for="symbol">Symbole boursier :</label><br>
+  <input type="text" id="symbol" placeholder="Ex : AAPL"><br>
+
+  <label for="companyName">Ou nom de l'entreprise :</label><br>
+  <input type="text" id="companyName" placeholder="Ex : Apple"><br>
+
+  <button onclick="startLookup()">Valider</button>
+
+  <div id="symbolSelector" style="display:none;"></div>
+
+  <div class="section">
+    <button class="toggle-btn" onclick="toggleChart()">Afficher/Masquer le graphique</button>
+    <div id="chartContainer">
+      <canvas id="priceChart" width="800" height="400"></canvas>
+    </div>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    const API_KEY = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
+    let currentChart = null;
+
+    async function safeFetchJson(url, options) {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error("Réponse non valide de l’API.");
+      }
+    }
+
+    async function startLookup() {
+      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+      const name = document.getElementById('companyName').value.trim();
+      const result = document.getElementById('results');
+      result.innerHTML = '';
+      if (currentChart) currentChart.destroy();
+      document.getElementById('symbolSelector').style.display = 'none';
+
+      if (symbol) return getAllStockData(symbol);
+
+      if (name) {
+        const url = `https://yfapi.net/v6/finance/autocomplete?query=${encodeURIComponent(name)}&lang=fr`;
+        let data = await safeFetchJson(url, { headers: { 'x-api-key': API_KEY } });
+        const results = data?.ResultSet?.Result;
+        if (!results || results.length === 0) {
+          result.innerHTML = `<p style="color:red">Aucun résultat trouvé pour "${name}".</p>`;
+          return;
+        }
+
+        const select = document.createElement('select');
+        select.id = "symbolChoice";
+        select.innerHTML = results.map(r =>
+          `<option value="${r.symbol}">${r.symbol} - ${r.name} (${r.exchDisp})</option>`
+        ).join('');
+
+        const btn = document.createElement('button');
+        btn.textContent = 'Choisir ce symbole';
+        btn.onclick = () => {
+          const selected = document.getElementById('symbolChoice').value;
+          document.getElementById('symbolSelector').style.display = 'none';
+          getAllStockData(selected);
+        };
+
+        const container = document.getElementById('symbolSelector');
+        container.innerHTML = '<h3>Résultats trouvés :</h3>';
+        container.appendChild(select);
+        container.appendChild(document.createElement('br'));
+        container.appendChild(btn);
+        container.style.display = 'block';
+      }
+    }
+
+    async function getAllStockData(symbol) {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '<p>Chargement des données...</p>';
+      const ctx = document.getElementById('priceChart').getContext('2d');
+      if (currentChart) currentChart.destroy();
+
+      try {
+        const quoteData = await safeFetchJson(`https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=price,summaryDetail,financialData,defaultKeyStatistics,incomeStatementHistory,balanceSheetHistory,cashflowStatementHistory`, {
+          headers: { 'x-api-key': API_KEY }
+        });
+
+        const chartData = await safeFetchJson(`https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo`, {
+          headers: { 'x-api-key': API_KEY }
+        });
+
+        const quote = quoteData?.quoteSummary?.result?.[0];
+        const timestamps = chartData?.chart?.result?.[0]?.timestamp;
+        const prices = chartData?.chart?.result?.[0]?.indicators?.adjclose?.[0]?.adjclose;
+        if (!quote || !timestamps || !prices) throw new Error("Données insuffisantes.");
+
+        const historicalPrices = timestamps.map((t, i) => ({
+          date: new Date(t * 1000).toISOString().split('T')[0],
+          close: prices[i]
+        })).filter(p => p.close);
+
+        resultsDiv.innerHTML = '';
+
+        const shares = quote.defaultKeyStatistics?.sharesOutstanding?.raw || null;
+        const income = quote.incomeStatementHistory?.incomeStatementHistory || [];
+        const balance = quote.balanceSheetHistory?.balanceSheetStatements || [];
+        const cashflow = quote.cashflowStatementHistory?.cashflowStatements || [];
+        const priceCurrent = quote.price?.regularMarketPrice?.raw || null;
+
+        const perList = [], pbrList = [], pcfList = [], psrList = [];
+        const years = Math.min(income.length, balance.length, cashflow.length, historicalPrices.length);
+
+        
+        const getSafe = (obj, pathArray) => {
+          return pathArray.reduce((acc, key) => (acc && acc[key] !== undefined) ? acc[key] : null, obj);
+        };
+
+        const getFallbackEquity = () => {
+          const bookVal = getSafe(quote, ['defaultKeyStatistics', 'bookValue', 'raw']) ||
+                          getSafe(quote, ['financialData', 'bookValue']) ||
+                          getSafe(quote, ['financialData', 'bookValue', 'raw']);
+          return (bookVal && shares) ? bookVal * shares : null;
+        };
+
+        // Cash flow estimé uniquement basé sur NetIncome * 1.2 si rien d'autre n'est dispo
+        const netIncomeNow = getSafe(income[0], ['netIncome', 'raw']);
+        const fallbackCashFlowTotal = (netIncomeNow && shares) ? netIncomeNow * 1.2 : null;
+
+        // Ratio PCF actuel estimé proprement
+        const pcfNow = (fallbackCashFlowTotal && priceCurrent && shares)
+          ? priceCurrent / (fallbackCashFlowTotal / shares)
+          : null;
+
+        for (let i = 0; i < years; i++) {
+          const net = getSafe(income[i], ['netIncome', 'raw']);
+          const equity = getSafe(balance[i], ['totalStockholderEquity', 'raw']) || getFallbackEquity();
+          const revenue = getSafe(income[i], ['totalRevenue', 'raw']) ||
+                          getSafe(quote, ['financialData', 'totalRevenue', 'raw']);
+          const price = historicalPrices[historicalPrices.length - 1 - i]?.close;
+
+          const opCF = fallbackCashFlowTotal;
+
+          if (shares && net && price) perList.push(price / (net / shares));
+          if (shares && equity && price) pbrList.push(price / (equity / shares));
+          if (shares && opCF && price) pcfList.push(price / (opCF / shares));
+          if (shares && revenue && price) psrList.push(price / (revenue / shares));
+        }
+
+
+        const perAvg = perList.length ? perList.reduce((a,b)=>a+b)/perList.length : null;
+        const pbrAvg = pbrList.length ? pbrList.reduce((a,b)=>a+b)/pbrList.length : null;
+        const pcfAvg = pcfList.length ? pcfList.reduce((a,b)=>a+b)/pcfList.length : null;
+        const psrAvg = psrList.length ? psrList.reduce((a,b)=>a+b)/psrList.length : null;
+
+        const perNow = quote.summaryDetail?.trailingPE?.raw;
+        const pbrNow = quote.defaultKeyStatistics?.priceToBook?.raw;
+        
+        const psrNow = quote.summaryDetail?.priceToSalesTrailing12Months?.raw;
+
+        const fairValues = {
+          PER: perAvg && perNow ? (perAvg / perNow) * priceCurrent : null,
+          PCF: pcfAvg && pcfNow ? (pcfAvg / pcfNow) * priceCurrent : null,
+          PSR: psrAvg && psrNow ? (psrAvg / psrNow) * priceCurrent : null,
+          PBR: pbrAvg && pbrNow ? (pbrAvg / pbrNow) * priceCurrent : null
+        };
+
+        const fairList = Object.values(fairValues).filter(v => typeof v === 'number');
+        const fairAvg = fairList.length ? fairList.reduce((a,b)=>a+b)/fairList.length : null;
+        const upside = fairAvg && priceCurrent ? ((fairAvg / priceCurrent - 1) * 100) : null;
+        const formatVal = v => typeof v === 'number' ? v.toFixed(2) : 'N/A';
+
+        displaySection('📊 Données Générales', {
+          symbole: symbol,
+          nom: quote.price?.longName || "N/A",
+          exchange: quote.price?.exchangeName || "N/A"
+        });
+
+        displaySection('📊 Ratios Financiers Actuels', {
+          PER: formatVal(perNow),
+          PCF: formatVal(pcfNow),
+          PSR: formatVal(psrNow),
+          PBR: formatVal(pbrNow)
+        });
+
+        displaySection('📐 Juste Valeur Estimée - Ratios Historiques', {
+          'Juste Valeur (PER)': formatVal(fairValues.PER),
+          'Juste Valeur (PCF)': formatVal(fairValues.PCF),
+          'Juste Valeur (PSR)': formatVal(fairValues.PSR),
+          'Juste Valeur (PBR)': formatVal(fairValues.PBR),
+          'Moyenne': formatVal(fairAvg),
+          'Potentiel (%)': upside !== null ? `${upside.toFixed(2)}%` : 'N/A'
+        });
+
+        const couleur = upside > 0 ? 'green' : 'red';
+        
+        // --- Affichage du tableau des ratios
+        const tableHTML = `
+          <h2>🧾 Détail des Justes Valeurs</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Ratio</th>
+                <th>Actuel</th>
+                <th>Moyenne Historique</th>
+                <th>Juste Valeur</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>PER</td><td>${formatVal(perNow)}</td><td>${formatVal(perAvg)}</td><td>${formatVal(fairValues.PER)}</td></tr>
+              <tr><td>PCF</td><td>${formatVal(pcfNow)}</td><td>${formatVal(pcfAvg)}</td><td>${formatVal(fairValues.PCF)}</td></tr>
+              <tr><td>PSR</td><td>${formatVal(psrNow)}</td><td>${formatVal(psrAvg)}</td><td>${formatVal(fairValues.PSR)}</td></tr>
+              <tr><td>PBR</td><td>${formatVal(pbrNow)}</td><td>${formatVal(pbrAvg)}</td><td>${formatVal(fairValues.PBR)}</td></tr>
+            </tbody>
+          </table>`;
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'section';
+        tableContainer.innerHTML = tableHTML;
+        document.getElementById('results').appendChild(tableContainer);
+
+const potentiel = document.createElement('div');
+        potentiel.className = 'section';
+        potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
+        resultsDiv.appendChild(potentiel);
+
+        currentChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: historicalPrices.map(p => p.date),
+            datasets: [{
+              label: `Prix historique (${symbol})`,
+              data: historicalPrices.map(p => p.close),
+              borderColor: 'green',
+              fill: false,
+              tension: 0.1
+            }]
+          }
+        });
+
+      } catch (err) {
+        resultsDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
+      }
+    }
+
+    function displaySection(title, obj) {
+      const section = document.createElement('div');
+      section.className = 'section';
+      const h2 = document.createElement('h2');
+      h2.textContent = title;
+
+      const btn = document.createElement('button');
+      btn.className = 'toggle-btn';
+      btn.textContent = 'Afficher/Masquer';
+
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(obj, null, 2);
+      btn.onclick = () => {
+        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+      };
+
+      section.appendChild(h2);
+      section.appendChild(btn);
+      section.appendChild(pre);
+      document.getElementById('results').appendChild(section);
+    }
+
+    function toggleChart() {
+      const chartDiv = document.getElementById('chartContainer');
+      chartDiv.style.display = chartDiv.style.display === 'none' ? 'block' : 'none';
+    }
+  </script>
+</body>
+</html>
