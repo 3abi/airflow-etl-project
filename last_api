@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>PROMETHEE — Ratios Financiers Fiables</title>
+  <title>PROMETHEE — Analyse Avancée avec PSR Historique</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial; background: #f4f4f4; padding: 20px; }
@@ -14,7 +14,7 @@
   </style>
 </head>
 <body>
-  <h1>📊 PROMETHEE — Analyse Financière Fiable (Yahoo Finance)</h1>
+  <h1>📊 PROMETHEE — Analyse Financière Avancée (Yahoo Finance)</h1>
 
   <label for="symbol">Symbole boursier :</label><br>
   <input type="text" id="symbol" placeholder="Ex : AAPL"><br>
@@ -124,22 +124,26 @@
         const cashflow = quote.cashflowStatementHistory?.cashflowStatements || [];
         const priceCurrent = quote.price?.regularMarketPrice?.raw || null;
 
-        const perList = [], pbrList = [], pcfList = [];
+        const perList = [], pbrList = [], pcfList = [], psrList = [];
         const years = Math.min(income.length, balance.length, cashflow.length, historicalPrices.length);
 
         for (let i = 0; i < years; i++) {
           const net = income[i]?.netIncome?.raw;
           const equity = balance[i]?.totalStockholderEquity?.raw;
+          const revenue = income[i]?.totalRevenue?.raw || quote.financialData?.totalRevenue?.raw;
           const operatingCashFlow = cashflow[i]?.totalCashFromOperatingActivities?.raw;
           const price = historicalPrices[historicalPrices.length - 1 - i]?.close;
+
           if (shares && net && price) perList.push(price / (net / shares));
           if (shares && equity && price) pbrList.push(price / (equity / shares));
           if (shares && operatingCashFlow && price) pcfList.push(price / (operatingCashFlow / shares));
+          if (shares && revenue && price) psrList.push(price / (revenue / shares));
         }
 
         const perAvg = perList.length ? perList.reduce((a,b)=>a+b)/perList.length : null;
         const pbrAvg = pbrList.length ? pbrList.reduce((a,b)=>a+b)/pbrList.length : null;
         const pcfAvg = pcfList.length ? pcfList.reduce((a,b)=>a+b)/pcfList.length : null;
+        const psrAvg = psrList.length ? psrList.reduce((a,b)=>a+b)/psrList.length : null;
 
         const perNow = quote.summaryDetail?.trailingPE?.raw;
         const pbrNow = quote.defaultKeyStatistics?.priceToBook?.raw;
@@ -149,7 +153,7 @@
         const fairValues = {
           PER: perAvg && perNow ? (perAvg / perNow) * priceCurrent : null,
           PCF: pcfAvg && pcfNow ? (pcfAvg / pcfNow) * priceCurrent : null,
-          PSR: psrNow ? priceCurrent : null,
+          PSR: psrAvg && psrNow ? (psrAvg / psrNow) * priceCurrent : null,
           PBR: pbrAvg && pbrNow ? (pbrAvg / pbrNow) * priceCurrent : null
         };
 
