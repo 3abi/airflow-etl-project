@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Exploration API Boursière - Nom ou Symbole</title>
+  <title>Analyse Boursière - Saisie par nom ou symbole</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -10,7 +10,7 @@
       background: #f4f4f4;
       padding: 20px;
     }
-    input, button {
+    input, button, select {
       padding: 8px;
       font-size: 16px;
       margin: 5px 0;
@@ -21,9 +21,6 @@
       padding: 15px;
       border-radius: 8px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    h1, h2 {
-      color: #333;
     }
     pre {
       background: #f0f0f0;
@@ -50,109 +47,81 @@
   </style>
 </head>
 <body>
-  <h1>PROMETHEE - Analyse Financière</h1>
+  <h1>🔍 Analyse Financière PROMETHEE</h1>
+
   <label for="symbol">Symbole boursier :</label><br>
   <input type="text" id="symbol" placeholder="Ex : AAPL"><br>
+
   <label for="companyName">Ou nom de l'entreprise :</label><br>
   <input type="text" id="companyName" placeholder="Ex : Apple"><br>
-  <button onclick="getAllStockData()">Obtenir les données</button>
+
+  <button onclick="startLookup()">Valider</button>
+
+  <div id="symbolSelector" style="display:none;"></div>
 
   <canvas id="priceChart" width="800" height="400"></canvas>
   <div id="results"></div>
 
   <script>
-    const yahooFinanceApiKey = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
+    const API_KEY = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
 
-    async function resolveSymbol(symbolInput, companyNameInput) {
-      const symbol = symbolInput.trim().toUpperCase();
-      const name = companyNameInput.trim();
+    async function startLookup() {
+      const symbolInput = document.getElementById('symbol').value.trim().toUpperCase();
+      const companyInput = document.getElementById('companyName').value.trim();
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
+      document.getElementById('priceChart').getContext('2d').clearRect(0, 0, 800, 400);
+      document.getElementById('symbolSelector').style.display = 'none';
 
-      if (symbol) return symbol;
+      if (symbolInput) {
+        getAllStockData(symbolInput);
+        return;
+      }
 
-      if (name) {
-        const url = `https://yfapi.net/v6/finance/autocomplete?query=${encodeURIComponent(name)}&lang=fr`;
-
+      if (companyInput) {
+        const url = `https://yfapi.net/v6/finance/autocomplete?query=${encodeURIComponent(companyInput)}&lang=fr`;
         const res = await fetch(url, {
-          headers: { 'x-api-key': yahooFinanceApiKey }
+          headers: { 'x-api-key': API_KEY }
         });
-
         const data = await res.json();
-        const match = data?.ResultSet?.Result?.[0];
+        const results = data?.ResultSet?.Result;
 
-        if (match?.symbol) return match.symbol;
-        else throw new Error("Aucun symbole trouvé pour ce nom d'entreprise.");
+        if (!results || results.length === 0) {
+          resultsDiv.innerHTML = `<p style="color:red">Aucun résultat trouvé pour "${companyInput}".</p>`;
+          return;
+        }
+
+        // Crée un sélecteur si plusieurs résultats
+        const selector = document.createElement('select');
+        selector.id = "symbolChoice";
+        selector.innerHTML = results
+          .map(r => `<option value="${r.symbol}">${r.symbol} - ${r.name}</option>`)
+          .join('');
+
+        const validateBtn = document.createElement('button');
+        validateBtn.textContent = 'Choisir ce symbole';
+        validateBtn.onclick = () => {
+          const selected = document.getElementById('symbolChoice').value;
+          document.getElementById('symbolSelector').style.display = 'none';
+          getAllStockData(selected);
+        };
+
+        const container = document.getElementById('symbolSelector');
+        container.innerHTML = '<h3>Plusieurs résultats trouvés :</h3>';
+        container.appendChild(selector);
+        container.appendChild(document.createElement('br'));
+        container.appendChild(validateBtn);
+        container.style.display = 'block';
       }
-
-      throw new Error("Veuillez saisir un symbole ou un nom d'entreprise.");
     }
 
-    async function fetchYahooFinanceData(symbol) {
-      const modules = [
-        "price","summaryDetail","financialData","defaultKeyStatistics",
-        "calendarEvents","earnings","quoteType"
-      ].join(',');
-
-      const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=${modules}`;
-      const response = await fetch(url, {
-        headers: { 'x-api-key': yahooFinanceApiKey }
-      });
-      const json = await response.json();
-      if (!json.quoteSummary?.result || !json.quoteSummary.result[0]) {
-        throw new Error(`Symbole invalide ou données manquantes pour ${symbol}`);
-      }
-      return json.quoteSummary.result[0];
-    }
-
-    async function fetchYahooHistoricalPrices(symbol) {
-      const url = `https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo&region=US`;
-      const response = await fetch(url, {
-        headers: { 'x-api-key': yahooFinanceApiKey }
-      });
-      const json = await response.json();
-      const timestamps = json.chart?.result?.[0]?.timestamp;
-      const prices = json.chart?.result?.[0]?.indicators?.adjclose?.[0]?.adjclose;
-      if (!timestamps || !prices) throw new Error("Données historiques non disponibles.");
-
-      return timestamps.map((ts, i) => ({
-        date: new Date(ts * 1000).toISOString().split('T')[0],
-        close: prices[i]
-      })).filter(p => p.close !== null);
-    }
-
-    function displaySection(title, dataObj) {
-      const section = document.createElement('div');
-      section.className = 'section';
-      const h2 = document.createElement('h2');
-      h2.textContent = title;
-
-      const toggleBtn = document.createElement('button');
-      toggleBtn.textContent = 'Afficher/Masquer';
-      toggleBtn.className = 'toggle-btn';
-
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(dataObj, null, 2);
-
-      toggleBtn.onclick = () => {
-        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
-      };
-
-      section.appendChild(h2);
-      section.appendChild(toggleBtn);
-      section.appendChild(pre);
-      document.getElementById('results').appendChild(section);
-    }
-
-    async function getAllStockData() {
+    async function getAllStockData(symbol) {
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = '<p>Chargement...</p>';
       const ctx = document.getElementById('priceChart').getContext('2d');
       ctx.clearRect(0, 0, 800, 400);
 
-      const symbolInput = document.getElementById('symbol').value;
-      const companyNameInput = document.getElementById('companyName').value;
-
       try {
-        const symbol = await resolveSymbol(symbolInput, companyNameInput);
         const [quote, historicalPrices] = await Promise.all([
           fetchYahooFinanceData(symbol),
           fetchYahooHistoricalPrices(symbol)
@@ -193,7 +162,7 @@
             datasets: [{
               label: `Prix historique (${symbol})`,
               data: historicalPrices.map(p => p.close),
-              borderColor: 'blue',
+              borderColor: 'green',
               fill: false,
               tension: 0.1
             }]
@@ -249,9 +218,61 @@
         potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
         resultsDiv.appendChild(potentiel);
 
-      } catch (error) {
-        resultsDiv.innerHTML = '<p style="color:red">Erreur : ' + error.message + '</p>';
+      } catch (err) {
+        resultsDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
       }
+    }
+
+    async function fetchYahooFinanceData(symbol) {
+      const modules = [
+        "price","summaryDetail","financialData","defaultKeyStatistics",
+        "calendarEvents","earnings","quoteType"
+      ].join(',');
+      const url = `https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=${modules}`;
+      const res = await fetch(url, {
+        headers: { 'x-api-key': API_KEY }
+      });
+      const json = await res.json();
+      if (!json.quoteSummary?.result?.[0]) throw new Error("Données introuvables pour ce symbole.");
+      return json.quoteSummary.result[0];
+    }
+
+    async function fetchYahooHistoricalPrices(symbol) {
+      const url = `https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo&region=US`;
+      const res = await fetch(url, {
+        headers: { 'x-api-key': API_KEY }
+      });
+      const json = await res.json();
+      const timestamps = json.chart?.result?.[0]?.timestamp;
+      const prices = json.chart?.result?.[0]?.indicators?.adjclose?.[0]?.adjclose;
+      if (!timestamps || !prices) throw new Error("Pas d’historique disponible.");
+      return timestamps.map((t, i) => ({
+        date: new Date(t * 1000).toISOString().split('T')[0],
+        close: prices[i]
+      })).filter(p => p.close);
+    }
+
+    function displaySection(title, obj) {
+      const section = document.createElement('div');
+      section.className = 'section';
+      const h2 = document.createElement('h2');
+      h2.textContent = title;
+
+      const btn = document.createElement('button');
+      btn.className = 'toggle-btn';
+      btn.textContent = 'Afficher/Masquer';
+
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(obj, null, 2);
+
+      btn.onclick = () => {
+        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+      };
+
+      section.appendChild(h2);
+      section.appendChild(btn);
+      section.appendChild(pre);
+      document.getElementById('results').appendChild(section);
     }
   </script>
 </body>
