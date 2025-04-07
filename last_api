@@ -49,18 +49,16 @@
   </style>
 </head>
 <body>
-  <h1>Exploration complète des APIs Marketstack & Yahoo Finance</h1>
+  <h1>PROMETHEE {based on Yahoo Finance}</h1>
   <label for="symbol">Symbole boursier :</label>
   <input type="text" id="symbol" placeholder="Ex : AAPL">
   <button onclick="getAllStockData()">Obtenir les données</button>
 
   <canvas id="priceChart" width="800" height="400"></canvas>
-  <canvas id="intradayChart" width="800" height="400"></canvas>
   <div id="results"></div>
 
   <script>
-    const yahooFinanceApiKey = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb'; //
-    const marketstackApiKey = '0e11e33f8b7a6385b3a4610a242222aa';
+    const yahooFinanceApiKey = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
 
     async function fetchYahooFinanceData(symbol) {
       const modules = [
@@ -77,17 +75,34 @@
       const response = await fetch(url, {
         headers: { 'x-api-key': yahooFinanceApiKey }
       });
-      if (!response.ok) throw new Error('Erreur Yahoo Finance');
-
       const json = await response.json();
+      if (!json.quoteSummary?.result || !json.quoteSummary.result[0]) {
+        throw new Error(`Symbole non trouvé ou invalide (${symbol})`);
+      }
       return json.quoteSummary.result[0];
     }
 
-    async function fetchMarketstackEndpoint(endpoint) {
-      const url = `https://api.marketstack.com/v1${endpoint}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Erreur API Marketstack : ${endpoint} (Code ${res.status})`);
-      return await res.json();
+    async function fetchYahooHistoricalPrices(symbol) {
+      const now = Math.floor(Date.now() / 1000);
+      const fiveYearsAgo = now - 60 * 60 * 24 * 365 * 5;
+      const url = `https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo&region=US`;
+
+      const response = await fetch(url, {
+        headers: { 'x-api-key': yahooFinanceApiKey }
+      });
+      const json = await response.json();
+
+      if (!json.chart?.result || !json.chart.result[0]?.timestamp) {
+        throw new Error("Erreur récupération historique Yahoo.");
+      }
+
+      const timestamps = json.chart.result[0].timestamp;
+      const prices = json.chart.result[0].indicators?.adjclose?.[0]?.adjclose;
+
+      return timestamps.map((ts, i) => ({
+        date: new Date(ts * 1000).toISOString().split('T')[0],
+        close: prices[i]
+      })).filter(p => p.close !== null);
     }
 
     function displaySection(title, dataObj) {
@@ -113,117 +128,22 @@
       document.getElementById('results').appendChild(section);
     }
 
-    function displayReadableTicker(data) {
-      if (!data) return;
-      const section = document.createElement('div');
-      section.className = 'section';
-      const h2 = document.createElement('h2');
-      h2.textContent = '📌 Détails lisibles du ticker';
-
-      const content = document.createElement('p');
-      content.innerHTML = `
-        <strong>Nom de l’entreprise :</strong> ${data.name || 'N/A'}<br>
-        <strong>Symbole :</strong> ${data.symbol || 'N/A'}<br>
-        <strong>Exchange :</strong> ${data.stock_exchange?.name || 'N/A'} (${data.stock_exchange?.acronym || ''})<br>
-        <strong>Devise :</strong> ${data.currency || 'N/A'}
-      `;
-      section.appendChild(h2);
-      section.appendChild(content);
-      document.getElementById('results').appendChild(section);
-    }
-
-    function plotPriceChart(data) {
-      const sorted = data.slice().reverse();
-      const labels = sorted.map(item => item.date.substring(0, 10));
-      const prices = sorted.map(item => item.close);
-
-      const ctx = document.getElementById('priceChart').getContext('2d');
-      if (window.priceChartInstance) window.priceChartInstance.destroy();
-
-      window.priceChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Prix de clôture (Marketstack)',
-            data: prices,
-            borderColor: 'blue',
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: false
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'top' }
-          },
-          scales: {
-            x: { display: true, title: { display: true, text: 'Date' } },
-            y: { display: true, title: { display: true, text: 'Prix ($)' } }
-          }
-        }
-      });
-    }
-
-    function plotIntradayChart(data) {
-      if (!Array.isArray(data)) return;
-      const sorted = data.slice().reverse();
-      const labels = sorted.map(item => item.date.split('T')[1]?.substring(0,5));
-      const prices = sorted.map(item => item.close);
-
-      const ctx = document.getElementById('intradayChart').getContext('2d');
-      if (window.intradayChartInstance) window.intradayChartInstance.destroy();
-
-      window.intradayChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Intraday (1min)',
-            data: prices,
-            borderColor: 'green',
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: false
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'top' }
-          },
-          scales: {
-            x: { display: true, title: { display: true, text: 'Heure (UTC)' } },
-            y: { display: true, title: { display: true, text: 'Prix ($)' } }
-          }
-        }
-      });
-    }
-
     async function getAllStockData() {
       const symbol = document.getElementById('symbol').value.trim().toUpperCase();
       if (!symbol) return alert("Veuillez saisir un symbole.");
 
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = '<p>Chargement...</p>';
-
-      const endpoints = [
-        { id: 'eod_latest', title: '📈 Données EOD actuelles', path: `/eod/latest?access_key=${marketstackApiKey}&symbols=${symbol}` },
-        { id: 'eod_history', title: '🕰️ Historique (5 ans)', path: `/eod?access_key=${marketstackApiKey}&symbols=${symbol}&limit=1200&sort=DESC` },
-        { id: 'ticker', title: 'ℹ️ Informations Ticker', path: `/tickers/${symbol}?access_key=${marketstackApiKey}` },
-        { id: 'exchanges', title: '🌍 Marchés Boursiers (Exchanges)', path: `/exchanges?access_key=${marketstackApiKey}` },
-        { id: 'intraday', title: '⏱️ Intraday 1min', path: `/intraday?access_key=${marketstackApiKey}&symbols=${symbol}&interval=1min&limit=50` },
-        { id: 'dividends', title: '💰 Dividendes', path: `/dividends?access_key=${marketstackApiKey}&symbols=${symbol}` },
-        { id: 'splits', title: '🔀 Fractionnements d’actions (Splits)', path: `/splits?access_key=${marketstackApiKey}&symbols=${symbol}` }
-      ];
+      const ctx = document.getElementById('priceChart').getContext('2d');
+      ctx.clearRect(0, 0, 800, 400);
 
       try {
-        const yahooData = await fetchYahooFinanceData(symbol);
-        resultsDiv.innerHTML = '';
+        const [quote, historicalPrices] = await Promise.all([
+          fetchYahooFinanceData(symbol),
+          fetchYahooHistoricalPrices(symbol)
+        ]);
 
-        // Données structurées à partir de Yahoo
-        const quote = yahooData;
+        resultsDiv.innerHTML = '';
 
         const general = {
           symbole: symbol,
@@ -247,34 +167,77 @@
           PBR: quote.defaultKeyStatistics?.priceToBook?.fmt || "N/A"
         };
 
-        displaySection('📊 Données Générales - Yahoo', general);
-        displaySection('📊 Données Fondamentales - Yahoo', fondamentaux);
-        displaySection('📊 Ratios Financiers - Yahoo', ratios);
+        displaySection('📊 Données Générales', general);
+        displaySection('📊 Données Fondamentales', fondamentaux);
+        displaySection('📊 Ratios Financiers { Actuels }', ratios);
 
-        for (const [key, value] of Object.entries(yahooData)) {
-          displaySection(`✨ Module Yahoo : ${key}`, value);
-        }
-
-        for (const endpoint of endpoints) {
-          try {
-            const data = await fetchMarketstackEndpoint(endpoint.path);
-            displaySection(`✅ Marketstack - ${endpoint.title}`, data.data || data);
-            if (endpoint.id === 'eod_history') {
-              plotPriceChart(data.data || data);
+        // Graphique des prix historiques
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: historicalPrices.map(p => p.date),
+            datasets: [{
+              label: `Prix historique (${symbol})`,
+              data: historicalPrices.map(p => p.close),
+              borderColor: 'green',
+              fill: false,
+              tension: 0.1
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { title: { display: true, text: 'Date' }},
+              y: { title: { display: true, text: 'Prix (USD)' }}
             }
-            if (endpoint.id === 'intraday') {
-              plotIntradayChart(data.data || data);
-            }
-            if (endpoint.id === 'ticker') {
-              displayReadableTicker(data.data);
-            }
-          } catch (e) {
-            displaySection(`❌ Marketstack - ${endpoint.title}`, { erreur: e.message });
           }
-        }
+        });
+
+        // Calcul de juste valeur
+        const earnings = quote.earnings?.earningsChart?.financialsChart?.yearly || [];
+        const earningsValues = earnings.map(e => e.earnings?.raw);
+        const prices = historicalPrices.slice(-earningsValues.length).map(p => p.close);
+        const perList = prices.map((price, i) => earningsValues[i] ? price / earningsValues[i] : null).filter(v => v);
+        const pbrList = prices.map((price, i) => earningsValues[i] ? price / earningsValues[i] : null).filter(v => v);
+
+        const perAvg = perList.length ? perList.reduce((a, b) => a + b, 0) / perList.length : null;
+        const pbrAvg = pbrList.length ? pbrList.reduce((a, b) => a + b, 0) / pbrList.length : null;
+
+        const perCurrent = quote.summaryDetail?.trailingPE?.raw || null;
+        const pcfCurrent = quote.defaultKeyStatistics?.priceToCashFlow?.raw || null;
+        const psrCurrent = quote.summaryDetail?.priceToSalesTrailing12Months?.raw || null;
+        const pbrCurrent = quote.defaultKeyStatistics?.priceToBook?.raw || null;
+        const priceCurrent = quote.price?.regularMarketPrice?.raw || null;
+
+        const fairValues = {
+          PER: (perAvg && perCurrent) ? (perAvg / perCurrent) * priceCurrent : null,
+          PCF: pcfCurrent ? priceCurrent : null,
+          PSR: psrCurrent ? priceCurrent : null,
+          PBR: (pbrAvg && pbrCurrent) ? (pbrAvg / pbrCurrent) * priceCurrent : null
+        };
+
+        const fairValuesList = Object.values(fairValues).filter(v => typeof v === 'number');
+        const fairAvg = fairValuesList.length ? fairValuesList.reduce((a, b) => a + b, 0) / fairValuesList.length : null;
+        const upside = fairAvg && priceCurrent ? ((fairAvg / priceCurrent - 1) * 100) : null;
+        const couleur = upside > 0 ? 'green' : 'red';
+
+        const formatVal = v => (typeof v === 'number' && !isNaN(v)) ? v.toFixed(2) : 'N/A';
+        displaySection('📐 Juste Valeur Estimée - Ratios Historiques', {
+          'Juste Valeur (PER)': formatVal(fairValues.PER),
+          'Juste Valeur (PCF)': formatVal(fairValues.PCF),
+          'Juste Valeur (PSR)': formatVal(fairValues.PSR),
+          'Juste Valeur (PBR)': formatVal(fairValues.PBR),
+          'Moyenne': formatVal(fairAvg),
+          'Potentiel (%)': upside !== null ? `${upside.toFixed(2)}%` : 'N/A'
+        });
+
+        const potentiel = document.createElement('div');
+        potentiel.className = 'section';
+        potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
+        resultsDiv.appendChild(potentiel);
+
       } catch (error) {
-        console.error(error);
-        resultsDiv.innerHTML = '<p style="color:red">Erreur globale lors de la récupération des données. Consultez la console.</p>';
+        resultsDiv.innerHTML = '<p style="color:red">Erreur : ' + error.message + '</p>';
       }
     }
   </script>
