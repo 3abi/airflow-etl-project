@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Analyse Boursière - Recherche avancée</title>
+  <title>Analyse Boursière - Version Complète</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial; background: #f4f4f4; padding: 20px; }
@@ -26,7 +26,13 @@
 
   <div id="symbolSelector" style="display:none;"></div>
 
-  <canvas id="priceChart" width="800" height="400"></canvas>
+  <div class="section">
+    <button id="toggleChartBtn" class="toggle-btn" onclick="toggleChart()">Afficher/Masquer le graphique</button>
+    <div id="chartContainer">
+      <canvas id="priceChart" width="800" height="400"></canvas>
+    </div>
+  </div>
+
   <div id="results"></div>
 
   <script>
@@ -39,7 +45,7 @@
       try {
         return JSON.parse(text);
       } catch {
-        throw new Error("❌ Réponse non valide reçue depuis l’API (probablement un message d'erreur ou indisponibilité).");
+        throw new Error("❌ Réponse non valide reçue depuis l’API.");
       }
     }
 
@@ -232,6 +238,11 @@
       section.appendChild(btn);
       section.appendChild(pre);
       document.getElementById('results').appendChild(section);
+    }
+
+    function toggleChart() {
+      const chartDiv = document.getElementById('chartContainer');
+      chartDiv.style.display = chartDiv.style.display === 'none' ? 'block' : 'none';
     }
   </script>
 </body>
