@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>PROMETHEE — Analyse Avancée avec PSR Historique</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+	#gaugeChart {
+	margin: 10 auto;
+	}
+    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+    input, button, select { padding: 8px; font-size: 16px; margin: 5px 0; }
+    .section { background: #fff; margin: 20px 0; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    pre { background: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    canvas { background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0,0,0,0.1); margin: 20px 0; }
+    .toggle-btn { background-color: #007bff; color: white; border: none; padding: 5px 10px; margin-bottom: 10px; border-radius: 4px; cursor: pointer; }
+  </style>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
+</head>
+<body>
+<h1>📊 PROMETHEE — Analyse Financière Avancée (Yahoo Finance)</h1>
+<label>
+<input checked="" id="inputModeToggle" onchange="toggleInputMode()" type="checkbox"/> Je connais le symbole exact
+  </label><br/>
+<input id="unifiedInput" placeholder="Ex : AAPL ou Apple Inc." type="text"/><br/>
+<button onclick="startUnifiedLookup()">Valider</button>
+<div id="symbolSelector" style="display:none;"></div>
+<div id="symbolSelector" style="display:none;"></div>
+<div class="section">
+<button class="toggle-btn" onclick="toggleChart()">Afficher/Masquer le graphique</button>
+<div id="chartContainer">
+<canvas height="400" id="priceChart" width="800"></canvas>
+</div>
+</div>
+<div style="display:flex; justify-content:center;">
+<canvas id="gaugeChart" style="max-width:1200px; max-height:200px;"></canvas>
+</div>
+<div id="potentielBadge" style="font-size:20px;font-weight:bold;"></div>
+<div id="results"></div>
+<div style="display:flex; justify-content:center;">
+<canvas id="radarChart" style="max-width:800px; max-height:500px; background:#f4f4f4; padding:10px; border-radius:8px; box-shadow:0 0 5px rgba(0,0,0,0.1);"></canvas>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-doughnutlabel@1.1.0"></script>
+<script>const API_KEY = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
+    let currentChart = null;
+
+    async function safeFetchJson(url, options) {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error("Réponse non valide de l’API.");
+      }
+    }
+
+    async function startLookup() {
+      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+      const name = document.getElementById('companyName').value.trim();
+      const result = document.getElementById('results');
+      result.innerHTML = '';
+      if (currentChart) currentChart.destroy();
+      document.getElementById('symbolSelector').style.display = 'none';
+
+      if (symbol) return getAllStockData(symbol);
+
+      if (name) {
+        const url = `https://yfapi.net/v6/finance/autocomplete?query=${encodeURIComponent(name)}&lang=fr`;
+        let data = await safeFetchJson(url, { headers: { 'x-api-key': API_KEY } });
+        const results = data?.ResultSet?.Result;
+        if (!results || results.length === 0) {
+          result.innerHTML = `<p style="color:red">Aucun résultat trouvé pour "${name}".</p>`;
+          return;
+        }
+
+        const select = document.createElement('select');
+        select.id = "symbolChoice";
+        select.innerHTML = results.map(r =>
+          `<option value="${r.symbol}">${r.symbol} - ${r.name} (${r.exchDisp})</option>`
+        ).join('');
+
+        const btn = document.createElement('button');
+        btn.textContent = 'Choisir ce symbole';
+        btn.onclick = () => {
+          const selected = document.getElementById('symbolChoice').value;
+          document.getElementById('symbolSelector').style.display = 'none';
+          getAllStockData(selected);
+        };
+
+        const container = document.getElementById('symbolSelector');
+        container.innerHTML = '<h3>Résultats trouvés :</h3>';
+        container.appendChild(select);
+        container.appendChild(document.createElement('br'));
+        container.appendChild(btn);
+        container.style.display = 'block';
+      }
+    }
+
+    async function getAllStockData(symbol) {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '<p>Chargement des données...</p>';
+      const ctx = document.getElementById('priceChart').getContext('2d');
+      if (currentChart) currentChart.destroy();
+
+      try {
+        const quoteData = await safeFetchJson(`https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=price,summaryDetail,financialData,defaultKeyStatistics,incomeStatementHistory,balanceSheetHistory,cashflowStatementHistory`, {
+          headers: { 'x-api-key': API_KEY }
+        });
+
+        const chartData = await safeFetchJson(`https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo`, {
+          headers: { 'x-api-key': API_KEY }
+        });
+
+        const quote = quoteData?.quoteSummary?.result?.[0];
+        renderDynamicInfoTable(quote);
+        const timestamps = chartData?.chart?.result?.[0]?.timestamp;
+        const prices = chartData?.chart?.result?.[0]?.indicators?.adjclose?.[0]?.adjclose;
+        if (!quote || !timestamps || !prices) throw new Error("Données insuffisantes.");
+
+        const historicalPrices = timestamps.map((t, i) => ({
+          date: new Date(t * 1000).toISOString().split('T')[0],
+          close: prices[i]
+        })).filter(p => p.close);
+
+        resultsDiv.innerHTML = '';
+
+        const shares = quote.defaultKeyStatistics?.sharesOutstanding?.raw || null;
+        const income = quote.incomeStatementHistory?.incomeStatementHistory || [];
+        const balance = quote.balanceSheetHistory?.balanceSheetStatements || [];
+        const cashflow = quote.cashflowStatementHistory?.cashflowStatements || [];
+        const priceCurrent = quote.price?.regularMarketPrice?.raw || null;
+
+        const perList = [], pbrList = [], pcfList = [], psrList = [];
+        const years = Math.min(income.length, balance.length, cashflow.length, historicalPrices.length);
+
+        
+        const getSafe = (obj, pathArray) => {
+          return pathArray.reduce((acc, key) => (acc && acc[key] !== undefined) ? acc[key] : null, obj);
+        };
+
+        const getFallbackEquity = () => {
+          const bookVal = getSafe(quote, ['defaultKeyStatistics', 'bookValue', 'raw']) ||
+                          getSafe(quote, ['financialData', 'bookValue']) ||
+                          getSafe(quote, ['financialData', 'bookValue', 'raw']);
+          return (bookVal && shares) ? bookVal * shares : null;
+        };
+
+        // Cash flow estimé uniquement basé sur NetIncome * 1.2 si rien d'autre n'est dispo
+        const netIncomeNow = getSafe(income[0], ['netIncome', 'raw']);
+        const fallbackCashFlowTotal = (netIncomeNow && shares) ? netIncomeNow * 1.2 : null;
+
+        // Ratio PCF actuel estimé proprement
+        const pcfNow = (fallbackCashFlowTotal && priceCurrent && shares)
+          ? priceCurrent / (fallbackCashFlowTotal / shares)
+          : null;
+
+        for (let i = 0; i < years; i++) {
+          const net = getSafe(income[i], ['netIncome', 'raw']);
+          const equity = getSafe(balance[i], ['totalStockholderEquity', 'raw']) || getFallbackEquity();
+          const revenue = getSafe(income[i], ['totalRevenue', 'raw']) ||
+                          getSafe(quote, ['financialData', 'totalRevenue', 'raw']);
+          const price = historicalPrices[historicalPrices.length - 1 - i]?.close;
+
+          const opCF = fallbackCashFlowTotal;
+
+          if (shares && net && price) perList.push(price / (net / shares));
+          if (shares && equity && price) pbrList.push(price / (equity / shares));
+          if (shares && opCF && price) pcfList.push(price / (opCF / shares));
+          if (shares && revenue && price) psrList.push(price / (revenue / shares));
+        }
+
+
+        const perAvg = perList.length ? perList.reduce((a,b)=>a+b)/perList.length : null;
+        const pbrAvg = pbrList.length ? pbrList.reduce((a,b)=>a+b)/pbrList.length : null;
+        const pcfAvg = pcfList.length ? pcfList.reduce((a,b)=>a+b)/pcfList.length : null;
+        const psrAvg = psrList.length ? psrList.reduce((a,b)=>a+b)/psrList.length : null;
+
+        const perNow = quote.summaryDetail?.trailingPE?.raw;
+        const pbrNow = quote.defaultKeyStatistics?.priceToBook?.raw;
+        
+        const psrNow = quote.summaryDetail?.priceToSalesTrailing12Months?.raw;
+
+        const fairValues = {
+          PER: perAvg && perNow ? (perAvg / perNow) * priceCurrent : null,
+          PCF: pcfAvg && pcfNow ? (pcfAvg / pcfNow) * priceCurrent : null,
+          PSR: psrAvg && psrNow ? (psrAvg / psrNow) * priceCurrent : null,
+          PBR: pbrAvg && pbrNow ? (pbrAvg / pbrNow) * priceCurrent : null
+        };
+
+        const fairList = Object.values(fairValues).filter(v => typeof v === 'number');
+        const fairAvg = fairList.length ? fairList.reduce((a,b)=>a+b)/fairList.length : null;
+        const upside = fairAvg && priceCurrent ? ((fairAvg / priceCurrent - 1) * 100) : null;
+        const formatVal = v => typeof v === 'number' ? v.toFixed(2) : 'N/A';
+
+        displaySection('📊 Données Générales', {
+          symbole: symbol,
+          nom: quote.price?.longName || "N/A",
+          exchange: quote.price?.exchangeName || "N/A"
+        });
+
+        displaySection('📊 Ratios Financiers Actuels', {
+          PER: formatVal(perNow),
+          PCF: formatVal(pcfNow),
+          PSR: formatVal(psrNow),
+          PBR: formatVal(pbrNow)
+        });
+
+        displaySection('📐 Juste Valeur Estimée - Ratios Historiques', {
+          'Juste Valeur (PER)': formatVal(fairValues.PER),
+          'Juste Valeur (PCF)': formatVal(fairValues.PCF),
+          'Juste Valeur (PSR)': formatVal(fairValues.PSR),
+          'Juste Valeur (PBR)': formatVal(fairValues.PBR),
+          'Moyenne': formatVal(fairAvg),
+          'Potentiel (%)': upside !== null ? `${upside.toFixed(2)}%` : 'N/A'
+        });
+
+        const couleur = upside > 0 ? 'green' : 'red';
+        
+        renderPotentielGauge(upside !== null ? `${upside.toFixed(2)}%` : '0%');
+
+function renderPotentielGauge(potentielStr) {
+  const ctx = document.getElementById('gaugeChart').getContext('2d');
+  const potentiel = parseFloat(potentielStr.replace('%', ''));
+  const safePotentiel = isNaN(potentiel) ? 0 : potentiel;
+
+  if (window.gaugeChartInstance) window.gaugeChartInstance.destroy();
+
+  window.gaugeChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [Math.min(Math.abs(safePotentiel), 100), 100 - Math.min(Math.abs(safePotentiel), 100)],
+        backgroundColor: [safePotentiel >= 0 ? '#28a745' : '#dc3545', '#e9ecef'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      rotation: -90,
+      circumference: 180,
+      cutout: '75%',
+      plugins: {
+        doughnutlabel: {
+          labels: [
+            { text: potentielStr, font: { size: '28' } },
+            { text: 'Potentiel', font: { size: '16' } }
+          ]
+        },
+        legend: { display: false }
+      }
+    }
+  });
+
+  const badge = document.getElementById('potentielBadge');
+  badge.textContent = safePotentiel > 0
+    ? `📈 Action potentiellement sous-évaluée (+${potentielStr})`
+    : `📉 Action surévaluée ou stable (${potentielStr})`;
+
+  badge.style.color = safePotentiel > 0 ? '#28a745' : '#dc3545';
+}
+
+// --- Affichage du tableau des ratios
+        const tableHTML = `
+          <h2>🧾 Détail des Justes Valeurs</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Ratio</th>
+                <th>Actuel</th>
+                <th>Moyenne Historique</th>
+                <th>Juste Valeur</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>PER</td><td>${formatVal(perNow)}</td><td>${formatVal(perAvg)}</td><td>${formatVal(fairValues.PER)}</td></tr>
+              <tr><td>PCF</td><td>${formatVal(pcfNow)}</td><td>${formatVal(pcfAvg)}</td><td>${formatVal(fairValues.PCF)}</td></tr>
+              <tr><td>PSR</td><td>${formatVal(psrNow)}</td><td>${formatVal(psrAvg)}</td><td>${formatVal(fairValues.PSR)}</td></tr>
+              <tr><td>PBR</td><td>${formatVal(pbrNow)}</td><td>${formatVal(pbrAvg)}</td><td>${formatVal(fairValues.PBR)}</td></tr>
+            </tbody>
+          </table>`;
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'section';
+        tableContainer.innerHTML = tableHTML;
+        document.getElementById('results').appendChild(tableContainer);
+
+const potentiel = document.createElement('div');
+        potentiel.className = 'section';
+        potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
+        resultsDiv.appendChild(potentiel);
+
+        
+        renderRadarChart({
+          perNow: perNow || 0,
+          perAvg: perAvg || 0,
+          pcfNow: pcfNow || 0,
+          pcfAvg: pcfAvg || 0,
+          psrNow: psrNow || 0,
+          psrAvg: psrAvg || 0,
+          pbrNow: pbrNow || 0,
+          pbrAvg: pbrAvg || 0
+        });
+
+currentChart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: historicalPrices.map(p => p.date),
+    datasets: [{
+      label: `Prix historique (${symbol})`,
+      data: historicalPrices.map(p => p.close),
+      borderColor: 'rgba(0, 123, 255, 1)',
+      backgroundColor: function(context) {
+        const chart = context.chart;
+        const {ctx, chartArea} = chart;
+        if (!chartArea) return null;
+        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        gradient.addColorStop(0, 'rgba(0, 123, 255, 0.5)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        return gradient;
+      },
+      pointRadius: 3,
+      tension: 0.2,
+      fill: true
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: true },
+      title: {
+        display: true,
+        text: `Historique des prix (${symbol})`
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        callbacks: {
+          label: function(context) {
+            const value = context.parsed.y.toFixed(2);
+            const prev = context.dataset.data[context.dataIndex - 1];
+            let variation = '';
+            if (prev !== undefined) {
+              const diff = value - prev;
+              const percent = (diff / prev) * 100;
+              variation = ` (${percent.toFixed(2)}%)`;
+            }
+            return `Prix: $${value}${variation}`;
+          }
+        }
+      },
+      annotation: {
+        annotations: {
+          lineCurrent: {
+            type: 'line',
+            yMin: historicalPrices[historicalPrices.length - 1].close,
+            yMax: historicalPrices[historicalPrices.length - 1].close,
+            borderColor: 'rgba(255, 99, 132, 0.7)',
+            borderWidth: 2,
+            label: {
+              content: 'Prix actuel',
+              enabled: true,
+              position: 'end'
+            }
+          }
+        }
+      }
+    },
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
+    scales: {
+      x: {
+        title: { display: true, text: 'Date' },
+        ticks: { maxTicksLimit: 12 }
+      },
+      y: {
+        title: { display: true, text: 'Prix ($)' },
+        beginAtZero: false
+      }
+    }
+  },
+  plugins: [Chart.registry.getPlugin('annotation')]
+});
+
+      } catch (err) {
+        resultsDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
+      }
+    }
+
+    function displaySection(title, obj) {
+      const section = document.createElement('div');
+      section.className = 'section';
+      const h2 = document.createElement('h2');
+      h2.textContent = title;
+
+      const btn = document.createElement('button');
+      btn.className = 'toggle-btn';
+      btn.textContent = 'Afficher/Masquer';
+
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(obj, null, 2);
+      btn.onclick = () => {
+        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+      };
+
+      section.appendChild(h2);
+      section.appendChild(btn);
+      section.appendChild(pre);
+      document.getElementById('results').appendChild(section);
+    }
+
+    function toggleChart() {
+      const chartDiv = document.getElementById('chartContainer');
+      chartDiv.style.display = chartDiv.style.display === 'none' ? 'block' : 'none';
+    }
+	
+	
+	
+  
+function renderRadarChart(data) {
+  const ctxRadar = document.getElementById('radarChart').getContext('2d');
+  if (window.radarChartInstance) window.radarChartInstance.destroy();
+  window.radarChartInstance = new Chart(ctxRadar, {
+    type: 'radar',
+    data: {
+      labels: ['PER', 'PCF', 'PSR', 'PBR'],
+      datasets: [
+        {
+          label: 'Ratio Actuel',
+          data: [data.perNow, data.pcfNow, data.psrNow, data.pbrNow],
+          fill: true,
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          pointBackgroundColor: 'rgba(54, 162, 235, 1)'
+        },
+        {
+          label: 'Moyenne Historique',
+          data: [data.perAvg, data.pcfAvg, data.psrAvg, data.pbrAvg],
+          fill: true,
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          pointBackgroundColor: 'rgba(255, 99, 132, 1)'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        title: {
+          display: true,
+          text: 'Ratios Actuels vs Historiques'
+        }
+      },
+      scales: {
+        r: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+
+function renderRadarChart(data) {
+  const ctxRadar = document.getElementById('radarChart').getContext('2d');
+  if (window.radarChartInstance) window.radarChartInstance.destroy();
+  window.radarChartInstance = new Chart(ctxRadar, {
+    type: 'radar',
+    data: {
+      labels: ['PER', 'PCF', 'PSR', 'PBR'],
+      datasets: [
+        {
+          label: 'Ratio Actuel',
+          data: [data.perNow, data.pcfNow, data.psrNow, data.pbrNow],
+          fill: true,
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          pointBackgroundColor: 'rgba(54, 162, 235, 1)'
+        },
+        {
+          label: 'Moyenne Historique',
+          data: [data.perAvg, data.pcfAvg, data.psrAvg, data.pbrAvg],
+          fill: true,
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          pointBackgroundColor: 'rgba(255, 99, 132, 1)'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        title: {
+          display: true,
+          text: 'Ratios Actuels vs Historiques'
+        }
+      },
+      scales: {
+        r: {
+          beginAtZero: true,
+          pointLabels: { color: '#333', font: { size: 14 } },
+          grid: { color: '#ccc' },
+          angleLines: { color: '#ccc' },
+          ticks: { backdropColor: '#f4f4f4' }
+        }
+      }
+    }
+  });
+}
+
+function toggleInputMode() {
+  const checkbox = document.getElementById('inputModeToggle');
+  const input = document.getElementById('unifiedInput');
+  input.placeholder = checkbox.checked ? "Ex : AAPL" : "Ex : Apple Inc.";
+}
+
+async function startUnifiedLookup() {
+  const modeSymbol = document.getElementById('inputModeToggle').checked;
+  const value = document.getElementById('unifiedInput').value.trim();
+  const result = document.getElementById('results');
+  result.innerHTML = '';
+  if (currentChart) currentChart.destroy();
+  document.getElementById('symbolSelector').style.display = 'none';
+
+  if (!value) return;
+
+  if (modeSymbol) {
+    return getAllStockData(value.toUpperCase());
+  } else {
+    const url = `https://yfapi.net/v6/finance/autocomplete?query=${encodeURIComponent(value)}&lang=fr`;
+    let data = await safeFetchJson(url, { headers: { 'x-api-key': API_KEY } });
+    const results = data?.ResultSet?.Result;
+    if (!results || results.length === 0) {
+      result.innerHTML = `<p style="color:red">Aucun résultat trouvé pour "${value}".</p>`;
+      return;
+    }
+
+    const select = document.createElement('select');
+    select.id = "symbolChoice";
+    select.innerHTML = results.map(r =>
+      `<option value="${r.symbol}">${r.symbol} - ${r.name} (${r.exchDisp})</option>`
+    ).join('');
+
+    const btn = document.createElement('button');
+    btn.textContent = 'Choisir ce symbole';
+    btn.onclick = () => {
+      const selected = document.getElementById('symbolChoice').value;
+      document.getElementById('symbolSelector').style.display = 'none';
+      getAllStockData(selected);
+    };
+
+    const container = document.getElementById('symbolSelector');
+    container.innerHTML = '<h3>Résultats trouvés :</h3>';
+    container.appendChild(select);
+    container.appendChild(document.createElement('br'));
+    container.appendChild(btn);
+    container.style.display = 'block';
+  }
+}
+
+
+document.addEventListener("DOMContentLoaded", function () {
+  const input = document.getElementById("unifiedInput");
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      startUnifiedLookup();
+    }
+  });
+});
+</script>
+<div class="section">
+<h2>📑 Informations Clés — API Yahoo Finance</h2>
+<table border="1" style="width:100%; border-collapse: collapse;">
+<thead style="background:#007bff;color:#fff;">
+<tr>
+<th style="padding:8px;">Variable « Info Clé »</th>
+<th style="padding:8px;">Module Name</th>
+<th style="padding:8px;">Variable Name</th>
+<th style="padding:8px;">Commentaire</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="padding:6px;">Beta</td><td>defaultKeyStatistics</td><td>beta</td><td>prendre la valeur "fmt"</td></tr>
+<tr><td style="padding:6px;">Debt to Equity</td><td>financialData</td><td>debtToEquity</td><td>prendre la valeur "fmt"</td></tr>
+<tr><td style="padding:6px;">Net Margin</td><td>financialData</td><td>profitMargins</td><td>prendre la valeur "fmt"</td></tr>
+<tr><td style="padding:6px;">Return on Equity</td><td>financialData</td><td>returnOnEquity</td><td>prendre la valeur "fmt"</td></tr>
+<tr><td style="padding:6px;">Dividend</td><td>summaryDetail</td><td>dividendRate</td><td>prendre la valeur "fmt"</td></tr>
+<tr><td style="padding:6px;">Yield</td><td>summaryDetail</td><td>dividendYield</td><td>prendre la valeur "fmt"</td></tr>
+<tr><td style="padding:6px;">Payout Ratio</td><td>summaryDetail</td><td>payoutRatio</td><td>prendre la valeur "fmt"</td></tr>
+<tr><td style="padding:6px;">EPS (BPA)</td><td>defaultKeyStatistics</td><td>trailingEps</td><td>prendre la valeur "fmt"</td></tr>
+<tr><td style="padding:6px;">Prix max 52 semaines</td><td>summaryDetail</td><td>fiftyTwoWeekHigh</td><td>prendre la valeur "fmt"</td></tr>
+<tr><td style="padding:6px;">Prix min 52 semaines</td><td>summaryDetail</td><td>fiftyTwoWeekLow</td><td>prendre la valeur "fmt"</td></tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="dynamicInfoTable"></div><script>
+function renderDynamicInfoTable(quote) {
+  const tableData = [
+    { label: "Beta", module: "defaultKeyStatistics", key: "beta" },
+    { label: "Debt to Equity", module: "financialData", key: "debtToEquity" },
+    { label: "Net Margin", module: "financialData", key: "profitMargins" },
+    { label: "Return on Equity", module: "financialData", key: "returnOnEquity" },
+    { label: "Dividend", module: "summaryDetail", key: "dividendRate" },
+    { label: "Yield", module: "summaryDetail", key: "dividendYield" },
+    { label: "Payout Ratio", module: "summaryDetail", key: "payoutRatio" },
+    { label: "EPS (BPA)", module: "defaultKeyStatistics", key: "trailingEps" },
+    { label: "Prix max 52 semaines", module: "summaryDetail", key: "fiftyTwoWeekHigh" },
+    { label: "Prix min 52 semaines", module: "summaryDetail", key: "fiftyTwoWeekLow" }
+  ];
+
+  const getVal = (mod, key) => quote?.[mod]?.[key]?.fmt || "N/A";
+
+  let html = '<h2>📌 Informations Clés — Données Dynamiques</h2>';
+  html += '<table style="width:100%; border-collapse: collapse;" border="1">';
+  html += '<thead style="background:#007bff;color:#fff;"><tr><th style="padding:8px;">Variable « Info Clé »</th><th style="padding:8px;">Module</th><th style="padding:8px;">Attribut</th><th style="padding:8px;">Valeur</th></tr></thead><tbody>';
+
+  tableData.forEach(row => {
+    html += `<tr>
+      <td style="padding:6px;">${row.label}</td>
+      <td style="padding:6px;">${row.module}</td>
+      <td style="padding:6px;">${row.key}</td>
+      <td style="padding:6px;">${getVal(row.module, row.key)}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+
+  document.getElementById('dynamicInfoTable').innerHTML = html;
+}
+</script></body>
+</html>
