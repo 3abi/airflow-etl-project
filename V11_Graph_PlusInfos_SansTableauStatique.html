@@ -38,9 +38,7 @@
 </div>
 <div id="potentielBadge" style="font-size:20px;font-weight:bold;"></div>
 <div id="results"></div>
-<div style="display:flex; justify-content:center;">
-<canvas id="radarChart" style="max-width:800px; max-height:500px; background:#f4f4f4; padding:10px; border-radius:8px; box-shadow:0 0 5px rgba(0,0,0,0.1);"></canvas>
-</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-doughnutlabel@1.1.0"></script>
 <script>const API_KEY = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
     let currentChart = null;
@@ -288,17 +286,6 @@ const potentiel = document.createElement('div');
         potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
         resultsDiv.appendChild(potentiel);
 
-        
-        renderRadarChart({
-          perNow: perNow || 0,
-          perAvg: perAvg || 0,
-          pcfNow: pcfNow || 0,
-          pcfAvg: pcfAvg || 0,
-          psrNow: psrNow || 0,
-          psrAvg: psrAvg || 0,
-          pbrNow: pbrNow || 0,
-          pbrAvg: pbrAvg || 0
-        });
 
 currentChart = new Chart(ctx, {
   type: 'line',
@@ -414,99 +401,8 @@ currentChart = new Chart(ctx, {
       chartDiv.style.display = chartDiv.style.display === 'none' ? 'block' : 'none';
     }
 	
-	
-	
-  
-function renderRadarChart(data) {
-  const ctxRadar = document.getElementById('radarChart').getContext('2d');
-  if (window.radarChartInstance) window.radarChartInstance.destroy();
-  window.radarChartInstance = new Chart(ctxRadar, {
-    type: 'radar',
-    data: {
-      labels: ['PER', 'PCF', 'PSR', 'PBR'],
-      datasets: [
-        {
-          label: 'Ratio Actuel',
-          data: [data.perNow, data.pcfNow, data.psrNow, data.pbrNow],
-          fill: true,
-          backgroundColor: 'rgba(54, 162, 235, 0.2)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          pointBackgroundColor: 'rgba(54, 162, 235, 1)'
-        },
-        {
-          label: 'Moyenne Historique',
-          data: [data.perAvg, data.pcfAvg, data.psrAvg, data.pbrAvg],
-          fill: true,
-          backgroundColor: 'rgba(255, 99, 132, 0.2)',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          pointBackgroundColor: 'rgba(255, 99, 132, 1)'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { position: 'top' },
-        title: {
-          display: true,
-          text: 'Ratios Actuels vs Historiques'
-        }
-      },
-      scales: {
-        r: { beginAtZero: true }
-      }
-    }
-  });
-}
 
 
-function renderRadarChart(data) {
-  const ctxRadar = document.getElementById('radarChart').getContext('2d');
-  if (window.radarChartInstance) window.radarChartInstance.destroy();
-  window.radarChartInstance = new Chart(ctxRadar, {
-    type: 'radar',
-    data: {
-      labels: ['PER', 'PCF', 'PSR', 'PBR'],
-      datasets: [
-        {
-          label: 'Ratio Actuel',
-          data: [data.perNow, data.pcfNow, data.psrNow, data.pbrNow],
-          fill: true,
-          backgroundColor: 'rgba(54, 162, 235, 0.2)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          pointBackgroundColor: 'rgba(54, 162, 235, 1)'
-        },
-        {
-          label: 'Moyenne Historique',
-          data: [data.perAvg, data.pcfAvg, data.psrAvg, data.pbrAvg],
-          fill: true,
-          backgroundColor: 'rgba(255, 99, 132, 0.2)',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          pointBackgroundColor: 'rgba(255, 99, 132, 1)'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { position: 'top' },
-        title: {
-          display: true,
-          text: 'Ratios Actuels vs Historiques'
-        }
-      },
-      scales: {
-        r: {
-          beginAtZero: true,
-          pointLabels: { color: '#333', font: { size: 14 } },
-          grid: { color: '#ccc' },
-          angleLines: { color: '#ccc' },
-          ticks: { backdropColor: '#f4f4f4' }
-        }
-      }
-    }
-  });
-}
 
 function toggleInputMode() {
   const checkbox = document.getElementById('inputModeToggle');
