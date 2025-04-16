@@ -1,228 +1,37 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>Analyse Boursière avec Yahoo Finance API</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      padding: 20px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    input, button {
-      padding: 10px;
-      font-size: 16px;
-      margin: 5px 0;
-    }
-    button {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    .section {
-      background: #fff;
-      margin: 20px 0;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    h1, h2 {
-      color: #333;
-    }
-    pre {
-      background: #f0f0f0;
-      padding: 10px;
-      border-radius: 5px;
-      overflow-x: auto;
-    }
-    canvas {
-      background: #fff;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-      margin: 20px 0;
-      max-width: 100%;
-    }
-    .toggle-btn {
-      background-color: #6c757d;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      margin-bottom: 10px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <h1>Analyse Financière PROMETHEE <small>(via Yahoo Finance API)</small></h1>
+// Version modifiée du script avec détection automatique du secteur et pondérations adaptées
 
-  <div class="section">
-    <label for="symbol">Symbole boursier :</label>
-    <input type="text" id="symbol" placeholder="Ex : AAPL, MSFT, TSLA">
-    <button id="fetchBtn" onclick="getAllStockData()">Analyser</button>
-  </div>
+// Exemple de récupération du secteur (à appeler lors de la récupération des données de l'action) 
 
-  <div id="charts">
-    <canvas id="priceChart" width="800" height="400"></canvas>
-    <canvas id="gaugeChart" width="500" height="250"></canvas>
-  </div>
+async function getSectorInfo(symbol) { const url = https://yh-finance.p.rapidapi.com/stock/v2/get-summary?symbol=${symbol}&region=US; 
 
-  <div id="results"></div>
+const response = await fetch(url, { 
 
-  <script>
-    const rapidApiKey = 'YOUR_RAPIDAPI_KEY';
-    const rapidApiHost = 'apidojo-yahoo-finance-v1.p.rapidapi.com';
+method: "GET", 
+headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": apiHost } }); 
 
-    async function fetchYahooSummary(symbol) {
-      const url = `https://${rapidApiHost}/market/v2/get-summary?region=US`;
-      const res = await fetch(url, {
-        headers: {
-          'X-RapidAPI-Key': rapidApiKey,
-          'X-RapidAPI-Host': rapidApiHost
-        }
-      });
-      return await res.json();
-    }
+const data = await response.json(); 
 
-    async function fetchYahooChart(symbol) {
-      const url = `https://${rapidApiHost}/stock/v3/get-chart?interval=1mo&region=US&symbol=${symbol}&range=5y&includePrePost=false&useYfid=true&includeAdjustedClose=true&events=capitalGain%2Cdiv%2Csplit`;
-      const res = await fetch(url, {
-        headers: {
-          'X-RapidAPI-Key': rapidApiKey,
-          'X-RapidAPI-Host': rapidApiHost
-        }
-      });
-      return await res.json();
-    }
+return data.summaryProfile?.sector || null; }
 
-    async function fetchYahooStatistics(symbol) {
-      const url = `https://${rapidApiHost}/stock/v4/get-statistics?symbol=${symbol}&region=US&lang=en-US`;
-      const res = await fetch(url, {
-        headers: {
-          'X-RapidAPI-Key': rapidApiKey,
-          'X-RapidAPI-Host': rapidApiHost
-        }
-      });
-      return await res.json();
-    }
+// Déterminer les pondérations en fonction du secteur détecté function getWeightingsBySector(sector) { if (!sector) return { PER: 0.30, PCF: 0.25, PSR: 0.20, PBR: 0.25 }; // par défaut
 
-    function plotPriceChart(timestamps, prices, symbol) {
-      const ctx = document.getElementById('priceChart').getContext('2d');
-      if (window.priceChartInstance) window.priceChartInstance.destroy();
+const s = sector.toLowerCase(); if (s.includes("technology") || s.includes("consumer cyclical")) { return { PER: 0.30, PCF: 0.35, PSR: 0.20, PBR: 0.15 }; 
 
-      window.priceChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: timestamps.map(t => new Date(t * 1000).toLocaleDateString()),
-          datasets: [{
-            label: `Cours de ${symbol} (5 ans)`,
-            data: prices,
-            borderColor: 'blue',
-            fill: false,
-            tension: 0.2
-          }]
-        }
-      });
-    }
+} else if (s.includes("financial") || s.includes("real estate")) { return { PER: 0.30, PCF: 0.15, PSR: 0.15, PBR: 0.40 }; 
+} else if (s.includes("industrial") || s.includes("utilities")) { return { PER: 0.35, PCF: 0.20, PSR: 0.15, PBR: 0.30 }; 
+} else { 
+return { PER: 0.30, PCF: 0.25, PSR: 0.20, PBR: 0.25 }; // fallback 
 
-    function plotGaugeChart(potential) {
-      const ctx = document.getElementById('gaugeChart').getContext('2d');
-      if (window.gaugeChartInstance) window.gaugeChartInstance.destroy();
+} }
 
-      window.gaugeChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Potentiel', ''],
-          datasets: [{
-            data: [Math.abs(potential), 100 - Math.abs(potential)],
-            backgroundColor: [potential >= 0 ? '#28a745' : '#dc3545', '#e9ecef'],
-            cutout: '70%',
-            rotation: -90,
-            circumference: 180
-          }]
-        },
-        options: {
-          plugins: {
-            tooltip: { enabled: false },
-            legend: { display: false },
-            datalabels: {
-              display: true,
-              formatter: () => `${potential.toFixed(1)}%`,
-              color: '#212529',
-              font: { size: 18, weight: 'bold' }
-            }
-          }
-        },
-        plugins: [ChartDataLabels]
-      });
-    }
+// Intégration dans le calcul principal avec pondération dynamique const sector = await getSectorInfo(symbol); const weights = getWeightingsBySector(sector);
 
-    function displaySection(title, data) {
-      const section = document.createElement('div');
-      section.className = 'section';
-      section.innerHTML = `<h2>${title}</h2><pre>${JSON.stringify(data, null, 2)}</pre>`;
-      document.getElementById('results').appendChild(section);
-    }
+const fairAvg = (fairValues.PER ? fairValues.PER * weights.PER : 0) + (fairValues.PCF ? fairValues.PCF * weights.PCF : 0) + (fairValues.PSR ? fairValues.PSR * weights.PSR : 0) + (fairValues.PBR ? fairValues.PBR * weights.PBR : 0);
 
-    async function getAllStockData() {
-      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '';
+const totalWeight = (fairValues.PER ? weights.PER : 0) + (fairValues.PCF ? weights.PCF : 0) + (fairValues.PSR ? weights.PSR : 0) + (fairValues.PBR ? weights.PBR : 0);
 
-      try {
-        const [chart, stats] = await Promise.all([
-          fetchYahooChart(symbol),
-          fetchYahooStatistics(symbol)
-        ]);
+const fairAvgWeighted = totalWeight > 0 ? fairAvg / totalWeight : null;
 
-        const chartData = chart.chart.result[0];
-        const timestamps = chartData.timestamp;
-        const prices = chartData.indicators.quote[0].close;
-        const currentPrice = prices[prices.length - 1];
+// Calcul du % de sous-/surévaluation const upside = fairAvgWeighted && priceCurrent ? ((fairAvgWeighted / priceCurrent - 1) * 100) : null;
 
-        plotPriceChart(timestamps, prices, symbol);
-
-        const shares = stats.defaultKeyStatistics?.sharesOutstanding?.raw || null;
-        const netIncome = stats.financialData?.netIncomeToCommon?.raw || null;
-        const revenue = stats.financialData?.totalRevenue?.raw || null;
-        const cashflow = stats.financialData?.operatingCashflow?.raw || null;
-        const equity = stats.balanceSheetHistory?.balanceSheetStatements?.[0]?.totalStockholderEquity?.raw || null;
-
-        const PERavg = (shares && netIncome) ? prices.slice(-5).reduce((a, p) => a + (p / (netIncome / shares)), 0) / 5 : null;
-        const PSRavg = (shares && revenue) ? prices.slice(-5).reduce((a, p) => a + (p / (revenue / shares)), 0) / 5 : null;
-        const PCFavg = (shares && cashflow) ? prices.slice(-5).reduce((a, p) => a + (p / (cashflow / shares)), 0) / 5 : null;
-        const PBRavg = (shares && equity) ? prices.slice(-5).reduce((a, p) => a + (p / (equity / shares)), 0) / 5 : null;
-
-        const trailingPE = stats.defaultKeyStatistics?.trailingPE?.raw || null;
-        const potential = (PERavg && trailingPE && currentPrice) ? (((PERavg / trailingPE) * currentPrice - currentPrice) / currentPrice) * 100 : 0;
-
-        const results = {
-          symbole: symbol,
-          prixActuel: currentPrice,
-          PERavg: PERavg?.toFixed(2) || 'N/A',
-          PBRavg: PBRavg?.toFixed(2) || 'N/A',
-          PSRavg: PSRavg?.toFixed(2) || 'N/A',
-          PCFavg: PCFavg?.toFixed(2) || 'N/A',
-          Potentiel: potential.toFixed(2) + '%'
-        };
-
-        displaySection('📊 Résumé Financier', results);
-        plotGaugeChart(potential);
-
-      } catch (e) {
-        resultsDiv.innerHTML = `<p style="color:red">Erreur : ${e.message}</p>`;
-      }
-    }
-  </script>
-</body>
-</html>
+const finalOutput = { 'Nom de l'action': name, 'Cours actuel': formatVal(priceCurrent), 'Devise': currency, 'Secteur détecté': sector || 'Inconnu', 'Juste Valeur Moyenne pondérée': formatVal(fairAvgWeighted), '% Sur/Sous-évaluation': upside !== null ? ${upside.toFixed(2)}% : 'N/A', 'Évaluation': upside !== null ? (upside > 0 ? 'Sous-évaluée' : 'Surévaluée') : 'Non déterminée' };
