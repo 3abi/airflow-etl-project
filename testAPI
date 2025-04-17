@@ -1,36 +1,9 @@
-version: '3.8'
+MYSQL_ROOT_PASSWORD=rootpass
+MYSQL_DATABASE=limesurvey
+MYSQL_USER=limesurveyuser
+MYSQL_PASSWORD=limesurveypass
 
-services:
-  db:
-    image: mariadb:10.5
-    container_name: limesurvey-db
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - db_data:/var/lib/mysql
-
-  limesurvey:
-    image: acspri/limesurvey:latest
-    container_name: limesurvey-app
-    restart: always
-    ports:
-      - "8080:80"
-    environment:
-      LIMESURVEY_DB_TYPE: mysql
-      LIMESURVEY_DB_HOST: db
-      LIMESURVEY_DB_NAME: ${MYSQL_DATABASE}
-      LIMESURVEY_DB_USER: ${MYSQL_USER}
-      LIMESURVEY_DB_PASSWORD: ${MYSQL_PASSWORD}
-      LIMESURVEY_ADMIN_USER: ${LIMESURVEY_ADMIN_USER}
-      LIMESURVEY_ADMIN_PASSWORD: ${LIMESURVEY_ADMIN_PASSWORD}
-      LIMESURVEY_ADMIN_NAME: ${LIMESURVEY_ADMIN_NAME}
-      LIMESURVEY_ADMIN_EMAIL: ${LIMESURVEY_ADMIN_EMAIL}
-    depends_on:
-      - db
-
-volumes:
-  db_data:
+LIMESURVEY_ADMIN_USER=admin
+LIMESURVEY_ADMIN_PASSWORD=adminpass
+LIMESURVEY_ADMIN_NAME=Admin
+LIMESURVEY_ADMIN_EMAIL=admin@example.com
