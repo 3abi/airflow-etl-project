@@ -1,9 +1,11 @@
-MYSQL_ROOT_PASSWORD=rootpass
-MYSQL_DATABASE=limesurvey
-MYSQL_USER=limesurveyuser
-MYSQL_PASSWORD=limesurveypass
-
-LIMESURVEY_ADMIN_USER=admin
-LIMESURVEY_ADMIN_PASSWORD=adminpass
-LIMESURVEY_ADMIN_NAME=Admin
-LIMESURVEY_ADMIN_EMAIL=admin@example.com
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: limesurvey-phpmyadmin
+    restart: always
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    depends_on:
+      - db
