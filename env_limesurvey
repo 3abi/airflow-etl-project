@@ -1,0 +1,11 @@
+# Configuration MariaDB
+MYSQL_ROOT_PASSWORD=rootpass
+MYSQL_DATABASE=limesurvey
+MYSQL_USER=limesurveyuser
+MYSQL_PASSWORD=limesurveypass
+
+# Configuration LimeSurvey
+LIMESURVEY_ADMIN_USER=admin
+LIMESURVEY_ADMIN_PASSWORD=adminpass
+LIMESURVEY_ADMIN_NAME=Admin
+LIMESURVEY_ADMIN_EMAIL=admin@example.com
