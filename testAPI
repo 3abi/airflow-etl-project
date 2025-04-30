@@ -1,11 +1,6 @@
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: limesurvey-phpmyadmin
-    restart: always
-    ports:
-      - "8081:80"
-    environment:
-      PMA_HOST: db
-      PMA_PORT: 3306
-    depends_on:
-      - db
+tar -czvf ./OUTPUT/LO-DATA.tar.gz ./INPUT/
+split -b 100M ./OUTPUT/LO-DATA.tar.gz ./OUTPUT/partie_
+
+
+cat ./OUTPUT/partie_* > ./LO-DATA.tar.gz
+tar -xzvf ./LO-DATA.tar.gz ./INPUT/
