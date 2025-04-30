@@ -2,49 +2,61 @@
 
 INPUT_DIR="./INPUT"
 OUTPUT_DIR="./OUTPUT"
-TMP_DIR="./TMP_RECONSTRUCT"
 SPLIT_SIZE="100M"
 
 mkdir -p "$OUTPUT_DIR"
-mkdir -p "$TMP_DIR"
 
-# Boucle sur chaque fichier de INPUT
 for filepath in "$INPUT_DIR"/*; do
-  [ -f "$filepath" ] || continue  # Ignorer si ce n’est pas un fichier
+  [ -f "$filepath" ] || continue
 
   filename=$(basename "$filepath")
   base="${filename%.*}"
 
-  echo "➡️  Traitement de $filename..."
+  echo "➡️  Archivage et split de $filename..."
 
-  # 1. Créer archive tar.gz
   archive_path="$OUTPUT_DIR/${base}.tar.gz"
   tar -czf "$archive_path" -C "$INPUT_DIR" "$filename"
 
-  # 2. Split de l'archive
   split_prefix="$OUTPUT_DIR/${base}_partie_"
   split -b "$SPLIT_SIZE" "$archive_path" "$split_prefix"
 
-  # 3. Reconstitution de l'archive
-  cat "$split_prefix"* > "$TMP_DIR/${base}_reconstruit.tar.gz"
+  echo "✅ Terminé pour $filename"
+  echo "-----------------------------------"
+done
 
-  # 4. Extraction test
-  extract_dir="$TMP_DIR/${base}_extract"
+
+
+
+#!/bin/bash
+
+OUTPUT_DIR="./OUTPUT"
+TMP_DIR="./TMP_RECONSTRUCT"
+
+mkdir -p "$TMP_DIR"
+
+# Trouver tous les préfixes des fichiers découpés
+cd "$OUTPUT_DIR" || exit 1
+for prefix in $(ls *_partie_* | sed 's/_partie_.*//' | sort -u); do
+  echo "➡️  Reconstitution de $prefix..."
+
+  cat ${prefix}_partie_* > "$TMP_DIR/${prefix}_reconstruit.tar.gz"
+
+  extract_dir="$TMP_DIR/${prefix}_extract"
   mkdir -p "$extract_dir"
-  if tar -xzf "$TMP_DIR/${base}_reconstruit.tar.gz" -C "$extract_dir"; then
-    echo "✅ Extraction OK pour $filename"
 
-    # 5. Nettoyage
-    echo "🧹 Nettoyage des fichiers temporaires..."
-    rm -f "$archive_path"
-    rm -f "$split_prefix"*
-    rm -f "$TMP_DIR/${base}_reconstruit.tar.gz"
+  if tar -xzf "$TMP_DIR/${prefix}_reconstruit.tar.gz" -C "$extract_dir"; then
+    echo "✅ Extraction OK pour $prefix"
+    echo "🧹 Nettoyage..."
+    rm -f "${prefix}.tar.gz"
+    rm -f "${prefix}_partie_"*
+    rm -f "$TMP_DIR/${prefix}_reconstruit.tar.gz"
     rm -rf "$extract_dir"
-
-    echo "✅ $filename traité et nettoyé."
+    echo "✅ Nettoyage terminé pour $prefix"
   else
-    echo "❌ Échec de l'extraction pour $filename"
+    echo "❌ Échec de l'extraction pour $prefix"
   fi
 
   echo "-----------------------------------"
 done
+
+
