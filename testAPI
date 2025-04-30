@@ -1,6 +1,50 @@
-tar -czvf ./OUTPUT/LO-DATA.tar.gz ./INPUT/
-split -b 100M ./OUTPUT/LO-DATA.tar.gz ./OUTPUT/partie_
+#!/bin/bash
 
+INPUT_DIR="./INPUT"
+OUTPUT_DIR="./OUTPUT"
+TMP_DIR="./TMP_RECONSTRUCT"
+SPLIT_SIZE="100M"
 
-cat ./OUTPUT/partie_* > ./LO-DATA.tar.gz
-tar -xzvf ./LO-DATA.tar.gz ./INPUT/
+mkdir -p "$OUTPUT_DIR"
+mkdir -p "$TMP_DIR"
+
+# Boucle sur chaque fichier de INPUT
+for filepath in "$INPUT_DIR"/*; do
+  [ -f "$filepath" ] || continue  # Ignorer si ce n’est pas un fichier
+
+  filename=$(basename "$filepath")
+  base="${filename%.*}"
+
+  echo "➡️  Traitement de $filename..."
+
+  # 1. Créer archive tar.gz
+  archive_path="$OUTPUT_DIR/${base}.tar.gz"
+  tar -czf "$archive_path" -C "$INPUT_DIR" "$filename"
+
+  # 2. Split de l'archive
+  split_prefix="$OUTPUT_DIR/${base}_partie_"
+  split -b "$SPLIT_SIZE" "$archive_path" "$split_prefix"
+
+  # 3. Reconstitution de l'archive
+  cat "$split_prefix"* > "$TMP_DIR/${base}_reconstruit.tar.gz"
+
+  # 4. Extraction test
+  extract_dir="$TMP_DIR/${base}_extract"
+  mkdir -p "$extract_dir"
+  if tar -xzf "$TMP_DIR/${base}_reconstruit.tar.gz" -C "$extract_dir"; then
+    echo "✅ Extraction OK pour $filename"
+
+    # 5. Nettoyage
+    echo "🧹 Nettoyage des fichiers temporaires..."
+    rm -f "$archive_path"
+    rm -f "$split_prefix"*
+    rm -f "$TMP_DIR/${base}_reconstruit.tar.gz"
+    rm -rf "$extract_dir"
+
+    echo "✅ $filename traité et nettoyé."
+  else
+    echo "❌ Échec de l'extraction pour $filename"
+  fi
+
+  echo "-----------------------------------"
+done
