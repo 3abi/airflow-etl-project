@@ -1,3 +1,3 @@
-.env: line 5: $'\r': command not found
-.env: line 10: $'\r': command not found
-Erreur : la commande 'mysqldump' est introuvable.
+177 packages can be upgraded. Run 'apt list --upgradable' to see them.
+E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)
+E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), are you root?
