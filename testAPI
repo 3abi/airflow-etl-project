@@ -1,15 +1,46 @@
-#!/bin/bash
+import sys
 
-# Récupère l'ID de la réponse passée depuis MariaDB
-RESPONSE_ID="$1"
-LOGFILE="/tmp/limesurvey_pipeline.log"
+def main():
+    response_id = sys.argv[1]
+    print(f"[init_variables] Initialisation pour la réponse ID={response_id}")
+    # TODO: charger données depuis BDD si besoin
+    # initialiser des variables globales, etc.
 
-echo "[INFO] Nouvelle réponse ID=$RESPONSE_ID à $(date)" >> "$LOGFILE"
+if __name__ == '__main__':
+    main()
 
-# Appel du script Python 1 - Initialisation des variables
-/usr/bin/python3 /opt/limesurvey_processing/init_variables.py "$RESPONSE_ID" >> "$LOGFILE" 2>&1
 
-# Appel du script Python 2 - Traitements principaux
-/usr/bin/python3 /opt/limesurvey_processing/process_response.py "$RESPONSE_ID" >> "$LOGFILE" 2>&1
+import sys
 
-echo "[INFO] Fin traitement ID=$RESPONSE_ID à $(date)" >> "$LOGFILE"
+def main():
+    response_id = sys.argv[1]
+    print(f"[process_response] Traitement des données pour la réponse ID={response_id}")
+    # TODO: scoring, génération de fichiers, envoi, etc.
+
+if __name__ == '__main__':
+    main()
+
+
+
+CREATE FUNCTION sys_exec RETURNS INT SONAME 'lib_mysqludf_sys.so';
+
+
+DELIMITER $$
+
+CREATE TRIGGER trigger_process_response
+AFTER INSERT ON responses
+FOR EACH ROW
+BEGIN
+  DECLARE cmd VARCHAR(255);
+  SET cmd = CONCAT('/opt/limesurvey_processing/process.sh ', NEW.id);
+  SET @res = sys_exec(cmd);
+END$$
+
+DELIMITER ;
+
+
+INSERT INTO responses (user_id, answer_text) VALUES (123, 'Ma réponse');
+
+
+cat /tmp/limesurvey_pipeline.log
+
