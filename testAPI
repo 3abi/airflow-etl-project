@@ -1,9 +1,14 @@
-🗂️ Présence des fichiers .gitkeep
-Certains dossiers du projet contiennent un fichier .gitkeep.
-Ce fichier est utilisé uniquement pour forcer Git à versionner des dossiers vides.
-Il peut être supprimé si le dossier contient désormais des fichiers utiles.
+# Utilise une image Python officielle
+FROM python:3.10-slim
 
+# Définir le dossier de travail
+WORKDIR /app
 
+# Copier les fichiers du projet dans l'image
+COPY . /app
 
-rm chemin/vers/ton/dossier/.gitkeep
+# Installer les dépendances
+RUN pip install --no-cache-dir -r requirements.txt
 
+# Par défaut, ne lance rien (ouchoisir un script par défaut si tu veux)
+CMD ["python3"]
