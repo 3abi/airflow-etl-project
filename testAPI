@@ -1,35 +1,4 @@
-pdfkit
-jinja2
-pypdf
-pandas
-matplotlib
-numpy
-
-
-# Utiliser une image Python officielle
-FROM python:3.10-slim
-
-# Installer wkhtmltopdf et les bibliothèques nécessaires
-RUN apt-get update && apt-get install -y \
-    wkhtmltopdf \
-    libssl-dev \
-    libffi-dev \
-    build-essential \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Définir le dossier de travail
-WORKDIR /app
-
-# Copier les dépendances et les scripts
-COPY requirements.txt .
-COPY script1.py .
-COPY script2.py .  # si tu en as plusieurs
-
-# Installer les dépendances Python
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Point d’entrée par défaut (modifiable à l'exécution)
-CMD ["python", "script1.py"]
-
-
+WKHTMLTOPDF_PATH = r"/home//studios/workspace/wkhtmltopdf.exe"  # Ubuntu
+TEMPLATE_PATH = r"C:\Users\\Desktop\\RESSOURCES\TEMPLATES"
+WORKSPACE_PATH = r"C:\Users\\Desktop\\WORKSPACE"
+OUTPUTS_PATH = r"C:\Users\\Desktop\\OUTPUTS"
