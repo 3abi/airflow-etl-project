@@ -1,4 +1,9 @@
-WKHTMLTOPDF_PATH = r"/home//studios/workspace/wkhtmltopdf.exe"  # Ubuntu
-TEMPLATE_PATH = r"C:\Users\\Desktop\\RESSOURCES\TEMPLATES"
-WORKSPACE_PATH = r"C:\Users\\Desktop\\WORKSPACE"
-OUTPUTS_PATH = r"C:\Users\\Desktop\\OUTPUTS"
+import os
+import pdfkit
+
+WKHTMLTOPDF_PATH = "/usr/bin/wkhtmltopdf"  # Chemin Linux dans Docker
+TEMPLATE_PATH = "/app/templates"
+WORKSPACE_PATH = "/app/workspace"
+OUTPUTS_PATH = "/app/outputs"
+
+config = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
