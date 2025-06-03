@@ -1,1 +1,44 @@
-ERROR: failed to solve: failed to compute cache key: failed to calculate checksum of ref 5969f0fd-2994-4fbe-aa06-80e78e1c0905::x81cklm7rgaoyp59s0g1yh81c: "/home/soufiane/diamma/outputs": not found
+FROM python:3.10-slim
+
+# Installer wkhtmltopdf et dépendances Python
+RUN apt-get update && apt-get install -y \
+    wkhtmltopdf \
+    build-essential \
+    libssl-dev \
+    libffi-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Créer un dossier de travail
+WORKDIR /app
+
+# Installer les dépendances
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Entrée par défaut
+CMD ["python", "script.py"]
+
+
+
+import os
+import pdfkit
+
+BASE_PATH = "/app"
+TEMPLATE_PATH = os.path.join(BASE_PATH, "templates")
+WORKSPACE_PATH = os.path.join(BASE_PATH, "workspace")
+OUTPUTS_PATH = os.path.join(BASE_PATH, "outputs")
+WKHTMLTOPDF_PATH = "/usr/bin/wkhtmltopdf"
+
+config = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+
+
+docker run --rm \
+  -v "$PWD/script.py:/app/script.py" \
+  -v "$PWD/templates:/app/templates" \
+  -v "$PWD/workspace:/app/workspace" \
+  -v "$PWD/outputs:/app/outputs" \
+  mon-projet
+
+
+
