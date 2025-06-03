@@ -1,9 +1,1 @@
-import os
-import pdfkit
-
-WKHTMLTOPDF_PATH = "/usr/bin/wkhtmltopdf"  # Chemin Linux dans Docker
-TEMPLATE_PATH = "/app/templates"
-WORKSPACE_PATH = "/app/workspace"
-OUTPUTS_PATH = "/app/outputs"
-
-config = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+ERROR: failed to solve: failed to compute cache key: failed to calculate checksum of ref 5969f0fd-2994-4fbe-aa06-80e78e1c0905::x81cklm7rgaoyp59s0g1yh81c: "/home/soufiane/diamma/outputs": not found
