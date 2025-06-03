@@ -1,44 +1,10 @@
-FROM python:3.10-slim
-
-# Installer wkhtmltopdf et dépendances Python
-RUN apt-get update && apt-get install -y \
-    wkhtmltopdf \
-    build-essential \
-    libssl-dev \
-    libffi-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Créer un dossier de travail
-WORKDIR /app
-
-# Installer les dépendances
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Entrée par défaut
-CMD ["python", "script.py"]
-
-
-
-import os
-import pdfkit
-
-BASE_PATH = "/app"
-TEMPLATE_PATH = os.path.join(BASE_PATH, "templates")
-WORKSPACE_PATH = os.path.join(BASE_PATH, "workspace")
-OUTPUTS_PATH = os.path.join(BASE_PATH, "outputs")
-WKHTMLTOPDF_PATH = "/usr/bin/wkhtmltopdf"
-
-config = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
-
-
-docker run --rm \
-  -v "$PWD/script.py:/app/script.py" \
-  -v "$PWD/templates:/app/templates" \
-  -v "$PWD/workspace:/app/workspace" \
-  -v "$PWD/outputs:/app/outputs" \
-  mon-projet
-
-
-
+Services Azure recommandés
+Composant	Azure Service
+Conteneurs	Azure Container Apps ou Azure Kubernetes Service (AKS)
+Base de données	Azure Database for MariaDB
+Worker Python	Azure Container Instance (ACI) ou Azure Functions (si event-driven)
+Stockage fichiers	Azure Blob Storage
+Gestion secrets	Azure Key Vault
+Supervision	Azure Monitor + Log Analytics
+CI/CD	Azure DevOps ou GitHub Actions
+Réseau sécurisé	Azure VNet, Private Endpoints, Application Gateway (WAF)
