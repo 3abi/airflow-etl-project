@@ -74,3 +74,63 @@ services:
 
 
 
+
+
+
+🐍 Base image : python:3.11-slim
+Image légère, maintenue officiellement par Python
+
+Moins de failles potentielles que les images "full"
+
+Compatible avec tous les outils modernes (pip, venv, pytest, etc.)
+
+Maintien facile de la version Python entre dev/test/stage
+
+
+
+🔐 Utilisateur non-root dans le conteneur
+Création d’un utilisateur devuser
+
+Empêche l’accès root à l’intérieur du conteneur
+
+Sécurité renforcée : bonne pratique DevSecOps
+
+Évite les permissions sur les fichiers partagés avec l’hôte (notamment sur Windows)
+
+Dockerfile
+Copier
+Modifier
+
+
+
+Volumes montés pour un développement en live
+Montage de ./python_project:/app dans le conteneur
+
+Code modifiable en temps réel depuis l’IDE local
+
+Aucun besoin de reconstruire l’image à chaque modification
+
+Compatible avec VS Code / PyCharm + extensions Docker
+
+
+
+ Accès direct à MariaDB via le réseau Docker
+Tous les services Docker sont sur le même réseau interne
+
+Accès à la base avec host=mariadb (pas besoin d’IP)
+
+Pas d’exposition du port MariaDB à l’extérieur si non nécessaire
+
+Favorise le test de bout en bout des scripts Python
+
+
+
+
+ Tests, Linting, Pre-commit intégrés dans l’image
+pytest pour les tests unitaires automatisés
+
+black et ruff pour le formatage et la vérification du style
+
+.pre-commit-config.yaml pour des hooks git (formatage auto avant chaque commit)
+
+
