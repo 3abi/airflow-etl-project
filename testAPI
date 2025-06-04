@@ -1,10 +1,76 @@
-Services Azure recommandés
-Composant	Azure Service
-Conteneurs	Azure Container Apps ou Azure Kubernetes Service (AKS)
-Base de données	Azure Database for MariaDB
-Worker Python	Azure Container Instance (ACI) ou Azure Functions (si event-driven)
-Stockage fichiers	Azure Blob Storage
-Gestion secrets	Azure Key Vault
-Supervision	Azure Monitor + Log Analytics
-CI/CD	Azure DevOps ou GitHub Actions
-Réseau sécurisé	Azure VNet, Private Endpoints, Application Gateway (WAF)
+.
+├── docker/
+│   └── dev.Dockerfile        # Image de développement Python
+├── docker-compose.yml        # Orchestration des services
+├── Makefile                  # Aide pour les commandes de développement
+├── python_project/
+│   ├── src/                  # Code source Python (modules, fonctions, classes)
+│   │   ├── __init__.py
+│   │   └── module1.py
+│   ├── main.py               # Point d’entrée pour exécuter localement
+│   ├── tests/                # Tests unitaires automatisés
+│   │   ├── __init__.py
+│   │   └── test_module1.py
+│   ├── requirements.txt      # Liste des dépendances Python
+│   ├── .env.example          # Variables d’environnement (sans secrets)
+│   ├── .pre-commit-config.yaml  # Configuration des hooks git
+│   └── README.md             # Documentation du projet
+
+
+
+
+
+# docker/dev.Dockerfile
+FROM python:3.11-slim
+
+# Crée un utilisateur non-root
+RUN useradd -ms /bin/bash devuser
+
+# Répertoire de travail
+WORKDIR /app
+
+# Copie les fichiers (le code sera aussi monté via volume dans docker-compose)
+COPY python_project/ /app
+
+# Installation des dépendances Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Passe en tant qu'utilisateur non-root
+USER devuser
+
+# Maintient le conteneur actif (mode dev)
+CMD ["tail", "-f", "/dev/null"]
+
+
+
+
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb
+    ...
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ...
+
+  limesurvey:
+    image: limesurvey/limesurvey
+    ...
+
+  python-dev:
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    volumes:
+      - ./python_project:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - default
+    depends_on:
+      - mariadb
+
+
+
