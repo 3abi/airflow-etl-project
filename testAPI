@@ -1,136 +1,80 @@
-.
-├── docker/
-│   └── dev.Dockerfile        # Image de développement Python
-├── docker-compose.yml        # Orchestration des services
-├── Makefile                  # Aide pour les commandes de développement
-├── python_project/
-│   ├── src/                  # Code source Python (modules, fonctions, classes)
-│   │   ├── __init__.py
-│   │   └── module1.py
-│   ├── main.py               # Point d’entrée pour exécuter localement
-│   ├── tests/                # Tests unitaires automatisés
-│   │   ├── __init__.py
-│   │   └── test_module1.py
-│   ├── requirements.txt      # Liste des dépendances Python
-│   ├── .env.example          # Variables d’environnement (sans secrets)
-│   ├── .pre-commit-config.yaml  # Configuration des hooks git
-│   └── README.md             # Documentation du projet
+#!/bin/bash
 
+set -e
 
+### Couleurs ###
+GREEN="\033[1;32m"
+RED="\033[1;31m"
+NC="\033[0m" # No Color
 
+echo -e "${GREEN}🚀 Lancement de l'installation du projet...${NC}"
 
+### 1. Vérification des prérequis ###
+check_and_install_docker() {
+  if ! command -v docker &> /dev/null; then
+    echo -e "${RED}❌ Docker non installé. Installation...${NC}"
+    curl -fsSL https://get.docker.com | sh
+    sudo usermod -aG docker "$USER"
+    echo -e "${GREEN}✅ Docker installé. Veuillez redémarrer votre session.${NC}"
+  else
+    echo -e "${GREEN}✅ Docker est déjà installé.${NC}"
+  fi
+}
 
-# docker/dev.Dockerfile
-FROM python:3.11-slim
+check_and_install_docker_compose() {
+  if ! command -v docker-compose &> /dev/null; then
+    echo -e "${RED}❌ Docker Compose non installé. Installation...${NC}"
+    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+      -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
+    echo -e "${GREEN}✅ Docker Compose installé.${NC}"
+  else
+    echo -e "${GREEN}✅ Docker Compose est déjà installé.${NC}"
+  fi
+}
 
-# Crée un utilisateur non-root
-RUN useradd -ms /bin/bash devuser
+check_and_install_docker
+check_and_install_docker_compose
 
-# Répertoire de travail
-WORKDIR /app
+### 2. Chargement de l’environnement ###
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+  echo -e "${GREEN}✅ Fichier .env chargé.${NC}"
+else
+  echo -e "${RED}⚠️  Fichier .env manquant ! Merci d'en créer un avant de continuer.${NC}"
+  exit 1
+fi
 
-# Copie les fichiers (le code sera aussi monté via volume dans docker-compose)
-COPY python_project/ /app
+### 3. Création des dossiers persistants ###
+mkdir -p data/db data/limesurvey_uploads
 
-# Installation des dépendances Python
-RUN pip install --no-cache-dir -r requirements.txt
+### 4. Vérification des fichiers critiques ###
+[ -f docker-compose.yml ] || { echo -e "${RED}❌ docker-compose.yml manquant !${NC}"; exit 1; }
+[ -f python_worker/requirements.txt ] || echo "# requirements" > python_worker/requirements.txt
+[ -f python_worker/main.py ] || echo "print('Hello from worker')" > python_worker/main.py
 
-# Passe en tant qu'utilisateur non-root
-USER devuser
+### 5. Build & Lancement ###
+echo -e "${GREEN}📦 Lancement de docker-compose...${NC}"
+docker-compose up -d --build
 
-# Maintient le conteneur actif (mode dev)
-CMD ["tail", "-f", "/dev/null"]
+### 6. Vérification de l’état des services ###
+check_service() {
+  local name="$1"
+  local status
+  status=$(docker inspect --format='{{.State.Health.Status}}' "$name" 2>/dev/null || echo "unknown")
+  
+  if [ "$status" == "healthy" ] || [ "$status" == "running" ]; then
+    echo -e "${GREEN}✅ Service $name est OK ($status)${NC}"
+  else
+    echo -e "${RED}❌ Service $name en erreur ou inconnu (status: $status)${NC}"
+  fi
+}
 
+echo -e "${GREEN}🔍 Vérification de l'état des conteneurs...${NC}"
+services=$(docker-compose ps -q)
+for id in $services; do
+  name=$(docker inspect --format='{{.Name}}' "$id" | cut -c2-)
+  check_service "$name"
+done
 
-
-
-version: '3.8'
-
-services:
-  mariadb:
-    image: mariadb
-    ...
-
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    ...
-
-  limesurvey:
-    image: limesurvey/limesurvey
-    ...
-
-  python-dev:
-    build:
-      context: .
-      dockerfile: docker/dev.Dockerfile
-    volumes:
-      - ./python_project:/app
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - default
-    depends_on:
-      - mariadb
-
-
-
-
-
-
-🐍 Base image : python:3.11-slim
-Image légère, maintenue officiellement par Python
-
-Moins de failles potentielles que les images "full"
-
-Compatible avec tous les outils modernes (pip, venv, pytest, etc.)
-
-Maintien facile de la version Python entre dev/test/stage
-
-
-
-🔐 Utilisateur non-root dans le conteneur
-Création d’un utilisateur devuser
-
-Empêche l’accès root à l’intérieur du conteneur
-
-Sécurité renforcée : bonne pratique DevSecOps
-
-Évite les permissions sur les fichiers partagés avec l’hôte (notamment sur Windows)
-
-Dockerfile
-Copier
-Modifier
-
-
-
-Volumes montés pour un développement en live
-Montage de ./python_project:/app dans le conteneur
-
-Code modifiable en temps réel depuis l’IDE local
-
-Aucun besoin de reconstruire l’image à chaque modification
-
-Compatible avec VS Code / PyCharm + extensions Docker
-
-
-
- Accès direct à MariaDB via le réseau Docker
-Tous les services Docker sont sur le même réseau interne
-
-Accès à la base avec host=mariadb (pas besoin d’IP)
-
-Pas d’exposition du port MariaDB à l’extérieur si non nécessaire
-
-Favorise le test de bout en bout des scripts Python
-
-
-
-
- Tests, Linting, Pre-commit intégrés dans l’image
-pytest pour les tests unitaires automatisés
-
-black et ruff pour le formatage et la vérification du style
-
-.pre-commit-config.yaml pour des hooks git (formatage auto avant chaque commit)
-
-
+echo -e "${GREEN}🎉 Installation terminée avec succès !${NC}"
