@@ -78,3 +78,23 @@ for id in $services; do
 done
 
 echo -e "${GREEN}🎉 Installation terminée avec succès !${NC}"
+
+
+
+
+
+Parfait. Voici un script install.sh idempotent, professionnel et robuste, adapté à ton dépôt GitLab existant. Il :
+
+Vérifie la présence de Docker et Docker Compose, et les installe si besoin.
+
+Vérifie l’existence des fichiers essentiels (.env, docker-compose.yml, etc.)
+
+Crée les dossiers manquants.
+
+Lance les conteneurs via docker-compose up -d --build.
+
+Vérifie la santé de chaque service.
+
+Est idempotent : il ne refait rien inutilement.
+
+
