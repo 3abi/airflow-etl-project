@@ -98,3 +98,77 @@ Vérifie la santé de chaque service.
 Est idempotent : il ne refait rien inutilement.
 
 
+
+
+🎯 Objectif
+Créer un fichier .sql contenant l’intégralité de la base de données LimeSurvey, afin de :
+
+Réaliser une sauvegarde manuelle ou automatisée
+
+Migrer la base vers un autre environnement
+
+Conserver un snapshot versionné de l’état de la base
+
+⚙️ Fonctionnement de l’export
+Le script utilise la commande mysqldump pour extraire toute la base, puis :
+
+Vérifie que le dossier db_dumps/ existe, ou le crée.
+
+Génère un fichier .sql horodaté avec la structure :
+
+bash
+Copier
+Modifier
+./db_dumps/limesurvey_db_YYYYMMDD_HHMMSS.sql
+Affiche un message de confirmation en cas de succès ou d’échec.
+
+🧑‍💻 Étapes détaillées pour exécuter un export
+1. Modifier les paramètres de connexion
+Dans le script limesurvey_db.sh, configure les variables :
+
+bash
+Copier
+Modifier
+DB_HOST="localhost"             # Adresse de la base (ex: localhost, 127.0.0.1, ou nom du conteneur Docker)
+DB_PORT="3306"                  # Port MariaDB (3306 par défaut)
+DB_USER="limesurvey_user"       # Utilisateur ayant les droits SELECT sur la base
+DB_PASS="votre_mot_de_passe"    # Mot de passe de l'utilisateur
+DB_NAME="limesurvey_db"         # Nom exact de la base
+DUMP_DIR="./db_dumps"           # Dossier de destination des exports
+2. Exécuter le script
+bash
+Copier
+Modifier
+./limesurvey_db.sh
+3. Choisir l'option "1"
+markdown
+Copier
+Modifier
+=== LimeSurvey DB Script ===
+1. Exporter la base
+2. Importer un dump
+Choix (1/2) : 1
+4. Vérifier le résultat
+Une fois l’opération terminée, tu verras un message du type :
+
+csharp
+Copier
+Modifier
+📤 Export de la base de données 'limesurvey_db' vers './db_dumps/limesurvey_db_20250604_153212.sql'...
+✅ Export réussi.
+📁 Exemple de structure des fichiers après plusieurs exports
+pgsql
+Copier
+Modifier
+db_dumps/
+├── limesurvey_db_20250601_110215.sql
+├── limesurvey_db_20250602_114450.sql
+└── limesurvey_db_20250604_153212.sql
+🛡 Bonnes pratiques
+Sauvegarder avant toute opération critique (import, mise à jour de LimeSurvey…)
+
+Ne jamais exposer ces fichiers en public (ils contiennent potentiellement des données sensibles)
+
+Versionner les dumps dans un dépôt Git privé si besoin de suivi historique
+
+Utiliser un système de rotation si les dumps sont générés automatiquement (pour éviter l’accumulation)
