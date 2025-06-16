@@ -182,3 +182,19 @@ To push the current branch and set the remote as upstream, use
 
     git push --set-upstream origin feature/holding-96
 
+
+def merge_csv_files(referentiel_number=95):
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        try:
+            referentiel_number = int(sys.argv[1])
+        except ValueError:
+            print("    Le paramètre doit être un nombre. Utilisation de la valeur par défaut 95.")
+            referentiel_number = 95
+    else:
+        referentiel_number = 95
+
+    merge_csv_files(referentiel_number)
+
+
