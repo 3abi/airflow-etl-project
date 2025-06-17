@@ -198,3 +198,31 @@ if __name__ == "__main__":
     merge_csv_files(referentiel_number)
 
 
+
+
+
+    Nombre de lignes dans input5 (./WORKSPACE/JOIN/RACDETFL_ITMMASFL_XD.CSV): 0
+Traceback (most recent call last):
+  File "/home/soufiane/.pyenv/versions/3.11.8/lib/python3.11/site-packages/pandas/core/indexes/base.py", line 3805, in get_loc
+    return self._engine.get_loc(casted_key)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc
+  File "index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7081, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7089, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'RDTYPE'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/soufiane/prjt-loxam-saft/./SCRIPTS/SALESINVOICE.py", line 189, in <module>
+    traiter_invoices()
+  File "/home/soufiane/prjt-loxam-saft/./SCRIPTS/SALESINVOICE.py", line 58, in traiter_invoices
+    df_input3 = df_input3[df_input3['RDTYPE'].isin(['ES', 'RI']) | ((df_input3['RDTYPE'] == 'SI') & (df_input3['RDCATG'] != 0))]
+                          ~~~~~~~~~^^^^^^^^^^
+  File "/home/soufiane/.pyenv/versions/3.11.8/lib/python3.11/site-packages/pandas/core/frame.py", line 4102, in __getitem__
+    indexer = self.columns.get_loc(key)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/soufiane/.pyenv/versions/3.11.8/lib/python3.11/site-packages/pandas/core/indexes/base.py", line 3812, in get_loc
+    raise KeyError(key) from err
+KeyError: 'RDTYPE'
