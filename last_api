@@ -1,240 +1,165 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>PROMETHEE — Analyse Avancée avec PSR Historique</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
-    input, button, select { padding: 8px; font-size: 16px; margin: 5px 0; }
-    .section { background: #fff; margin: 20px 0; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    pre { background: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto; }
-    canvas { background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0,0,0,0.1); margin: 20px 0; }
-    .toggle-btn { background-color: #007bff; color: white; border: none; padding: 5px 10px; margin-bottom: 10px; border-radius: 4px; cursor: pointer; }
-  </style>
-</head>
-<body>
-  <h1>📊 PROMETHEE — Analyse Financière Avancée (Yahoo Finance)</h1>
 
-  <label for="symbol">Symbole boursier :</label><br>
-  <input type="text" id="symbol" placeholder="Ex : AAPL"><br>
+import pandas as pd
+import datetime
 
-  <label for="companyName">Ou nom de l'entreprise :</label><br>
-  <input type="text" id="companyName" placeholder="Ex : Apple"><br>
+# Noms des fichiers source
+input1_file = './WORKSPACE/JOIN/input1_file.CSV'
+input2_file = './WORKSPACE/JOIN/input2_file.CSV' 
+input3_file = './WORKSPACE/JOIN/input3_file.CSV'
+input4_file = './WORKSPACE/JOIN/input4_file.CSV'
+input5_file = './WORKSPACE/JOIN/input5_file.CSV'  
 
-  <button onclick="startLookup()">Valider</button>
+# Nom du fichier résultat
+output_file = './WORKSPACE/TRANSFO/output_file.CSV'
 
-  <div id="symbolSelector" style="display:none;"></div>
+def traiter_invoices():
+    # Lire les fichiers d'entrée dans des DataFrames pandas
+    df_input1 = pd.read_csv(input1_file, delimiter=';', encoding='utf-8', dtype=str)
+    df_input2 = pd.read_csv(input2_file, delimiter=';', encoding='utf-8', dtype=str)
+    df_input3 = pd.read_csv(input3_file, delimiter=';', encoding='utf-8', dtype=str)
+    df_input4 = pd.read_csv(input4_file, delimiter=';', encoding='utf-8', dtype=str)
+    df_input5 = pd.read_csv(input5_file, delimiter=';', encoding='utf-8', dtype=str)  # Lecture de input5
 
-  <div class="section">
-    <button class="toggle-btn" onclick="toggleChart()">Afficher/Masquer le graphique</button>
-    <div id="chartContainer">
-      <canvas id="priceChart" width="800" height="400"></canvas>
-    </div>
-  </div>
+    # Afficher le nombre de lignes de chaque fichier d'entrée
+    print(f"    Nombre de lignes dans input1 ({input1_file}): {len(df_input1)}")
+    print(f"    Nombre de lignes dans input2 ({input2_file}): {len(df_input2)}")
+    print(f"    Nombre de lignes dans input3 ({input3_file}): {len(df_input3)}")
+    print(f"    Nombre de lignes dans input4 ({input4_file}): {len(df_input4)}")
+    print(f"    Nombre de lignes dans input5 ({input5_file}): {len(df_input5)}")  # Affichage pour input5
 
-  <div id="results"></div>
+    # Filtrer les fichiers input3 et input4
+    #df_input3 = df_input3[df_input3['RDTYPE'].isin(['RI', 'ES'])]
+    #df_input4 = df_input4[~df_input4['RDTYPE'].isin(['RI', 'ES'])]
+    
+    df_input3 = df_input3[df_input3['RDTYPE'].isin(['ES', 'RI']) | ((df_input3['RDTYPE'] == 'SI') & (df_input3['RDCATG'] != 0))]
+    df_input4 = df_input4[(~df_input4['RDTYPE'].isin(['ES', 'RI'])) | ((df_input4['RDTYPE'] == 'SI') & (df_input4['RDCATG'] != 0))]
 
-  <script>
-    const API_KEY = 'rttxsajf3H5LODaejekoq1EVeAOxwQG98tdRyDZb';
-    let currentChart = null;
+    # Ajouter une colonne 'Source' pour identifier l'origine des enregistrements
+    df_input1['Source'] = 'input1'
+    df_input2['Source'] = 'input2'
+    df_input3['Source'] = 'input3'
+    df_input4['Source'] = 'input4'
+    df_input5['Source'] = 'input5'  # Ajout de la colonne Source pour input5
 
-    async function safeFetchJson(url, options) {
-      const res = await fetch(url, options);
-      const text = await res.text();
-      try {
-        return JSON.parse(text);
-      } catch {
-        throw new Error("Réponse non valide de l’API.");
-      }
-    }
+    # Gestion des colonnes 'RHTYPE' et 'GJAMT$' dans df_input1
+    if 'RHTYPE' not in df_input1.columns:
+        df_input1['RHTYPE'] = ''
+    if 'GJAMT$' not in df_input1.columns:
+        df_input1['GJAMT$'] = '0'
+    df_input1['GJAMT$_float'] = pd.to_numeric(df_input1['GJAMT$'], errors='coerce').fillna(0.0) #AHAMT$
 
-    async function startLookup() {
-      const symbol = document.getElementById('symbol').value.trim().toUpperCase();
-      const name = document.getElementById('companyName').value.trim();
-      const result = document.getElementById('results');
-      result.innerHTML = '';
-      if (currentChart) currentChart.destroy();
-      document.getElementById('symbolSelector').style.display = 'none';
+    # Assurer que 'RHTYPE' n'a pas de valeurs manquantes ou d'espaces superflus
+    df_input1['RHTYPE'] = df_input1['RHTYPE'].fillna('ERREUR_TYPE').str.strip()
 
-      if (symbol) return getAllStockData(symbol);
+    # Jointure des DataFrames selon les clés spécifiées
+    df_merged_input2 = df_input1.merge(
+        df_input2, left_on='GJINV#', right_on='KEY1_x', how='inner', suffixes=('', '_input2') 
+    )
+    df_merged_input3 = df_input1.merge(
+        df_input3, left_on='GJINV#', right_on='KEY1', how='inner', suffixes=('', '_input3')
+    )
+    df_merged_input4 = df_input1.merge(
+        df_input4, left_on='GJINV#', right_on='KEY1_x', how='inner', suffixes=('', '_input4')
+    )
+    df_merged_input5 = df_input1.merge(
+        df_input5, left_on='GJINV#', right_on='KEY1_x', how='inner', suffixes=('', '_input5')
+    )
 
-      if (name) {
-        const url = `https://yfapi.net/v6/finance/autocomplete?query=${encodeURIComponent(name)}&lang=fr`;
-        let data = await safeFetchJson(url, { headers: { 'x-api-key': API_KEY } });
-        const results = data?.ResultSet?.Result;
-        if (!results || results.length === 0) {
-          result.innerHTML = `<p style="color:red">Aucun résultat trouvé pour "${name}".</p>`;
-          return;
-        }
+    # Fusionner les DataFrames pour inclure toutes les lignes
+    df_merged_ok = pd.concat([df_merged_input2, df_merged_input3, df_merged_input4, df_merged_input5], ignore_index=True)
 
-        const select = document.createElement('select');
-        select.id = "symbolChoice";
-        select.innerHTML = results.map(r =>
-          `<option value="${r.symbol}">${r.symbol} - ${r.name} (${r.exchDisp})</option>`
-        ).join('');
+    # Effectuer une jointure externe pour inclure toutes les lignes de df_input1 qui ne sont pas dans df_merged_ok
+    df_merged = df_input1.merge(
+        df_merged_ok, on='GJINV#', how='left', suffixes=('', '_noinput')
+    )
 
-        const btn = document.createElement('button');
-        btn.textContent = 'Choisir ce symbole';
-        btn.onclick = () => {
-          const selected = document.getElementById('symbolChoice').value;
-          document.getElementById('symbolSelector').style.display = 'none';
-          getAllStockData(selected);
-        };
+    # Déterminer la 'Source' finale en fonction des fusions réussies
+    df_merged['Source'] = 'ERREUR_Source'
+    df_merged.loc[df_merged['Source_input2'].notnull(), 'Source'] = 'input2'
+    df_merged.loc[df_merged['Source_input3'].notnull(), 'Source'] = 'input3'
+    df_merged.loc[df_merged['Source_input4'].notnull(), 'Source'] = 'input4'
+    df_merged.loc[df_merged['Source_input5'].notnull(), 'Source'] = 'input5'
 
-        const container = document.getElementById('symbolSelector');
-        container.innerHTML = '<h3>Résultats trouvés :</h3>';
-        container.appendChild(select);
-        container.appendChild(document.createElement('br'));
-        container.appendChild(btn);
-        container.style.display = 'block';
-      }
-    }
+    # Appliquer la nouvelle règle pour 'InvoiceType'
+    df_merged['InvoiceType'] = df_merged.apply(
+        lambda row: row['RHTYPE'] if row['RHTYPE'] != 'ERREUR_TYPE' else ('O' if row['GJAMT$_float'] > 0 else 'C'),
+        axis=1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+    )
 
-    async function getAllStockData(symbol) {
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '<p>Chargement des données...</p>';
-      const ctx = document.getElementById('priceChart').getContext('2d');
-      if (currentChart) currentChart.destroy();
+    # Déterminer 'LineNumber' en fonction de la source
+    df_merged['LineNumber'] = '0'
+    df_merged.loc[df_merged['Source'] == 'input3', 'LineNumber'] = df_merged['RDTYPE'].fillna('') + '_' + df_merged['RDSEQ#'].fillna('')
+    df_merged.loc[df_merged['Source'] == 'input4', 'LineNumber'] = df_merged['RDTYPE'].fillna('') + '_' + df_merged['RDSEQ#'].fillna('')
+    df_merged.loc[df_merged['Source'] == 'input5', 'LineNumber'] = df_merged['RDTYPE'].fillna('') + '_' + df_merged['RDSEQ#'].fillna('')
+    df_merged.loc[df_merged['Source'] == 'input2', 'LineNumber'] = df_merged['RSSEQ#'].fillna('')
 
-      try {
-        const quoteData = await safeFetchJson(`https://yfapi.net/v11/finance/quoteSummary/${symbol}?modules=price,summaryDetail,financialData,defaultKeyStatistics,incomeStatementHistory,balanceSheetHistory,cashflowStatementHistory`, {
-          headers: { 'x-api-key': API_KEY }
-        });
+    # Déterminer 'Description' en fonction de la source
+    df_merged['Description'] = '0'
+    df_merged.loc[df_merged['Source'] == 'input2', 'Description'] = df_merged['IMDESC'].fillna('')
+    df_merged.loc[df_merged['Source'] == 'input4', 'Description'] = df_merged['IMDESC'].fillna('')
+    df_merged.loc[df_merged['Source'] == 'input5', 'Description'] = df_merged['IMDESC'].fillna('')
+    df_merged.loc[df_merged['Source'] == 'input3', 'Description'] = df_merged['ECDESC'].fillna('')
 
-        const chartData = await safeFetchJson(`https://yfapi.net/v8/finance/chart/${symbol}?range=5y&interval=1mo`, {
-          headers: { 'x-api-key': API_KEY }
-        });
+    # Calculer 'ProductCode' en fonction de la source
+    df_merged['ProductCode'] = '0'
+    df_merged.loc[df_merged['Source'] == 'input3', 'ProductCode'] = df_merged['RDITEM'].fillna('')
+    df_merged.loc[df_merged['Source'] == 'input4', 'ProductCode'] = df_merged['RDSTKC'].fillna('') + '_' + df_merged['RDITEM'].fillna('')
+    df_merged.loc[df_merged['Source'] == 'input5', 'ProductCode'] = df_merged['RDSTKC'].fillna('') + '_' + df_merged['RDITEM'].fillna('')
+    df_merged.loc[df_merged['Source'] == 'input2', 'ProductCode'] = df_merged['RSSTKC'].fillna('') + '_' + df_merged['RSITEM'].fillna('')
 
-        const quote = quoteData?.quoteSummary?.result?.[0];
-        const timestamps = chartData?.chart?.result?.[0]?.timestamp;
-        const prices = chartData?.chart?.result?.[0]?.indicators?.adjclose?.[0]?.adjclose;
-        if (!quote || !timestamps || !prices) throw new Error("Données insuffisantes.");
+    # Calculer 'UnitPrice' en fonction de la source
+    df_merged['UnitPrice'] = df_merged['GJAMT$'].fillna('0.0')  # valeur par défaut
+    df_merged.loc[df_merged['Source'] == 'input3', 'UnitPrice'] = df_merged['RDAMT$'].fillna(df_merged['GJAMT$'])
+    df_merged.loc[df_merged['Source'] == 'input4', 'UnitPrice'] = df_merged['RDAMT$'].fillna(df_merged['GJAMT$'])
+    df_merged.loc[df_merged['Source'] == 'input5', 'UnitPrice'] = df_merged['RDAMT$'].fillna(df_merged['GJAMT$'])
+    df_merged.loc[df_merged['Source'] == 'input2', 'UnitPrice'] = df_merged['RSAMT$'].fillna(df_merged['GJAMT$'])
 
-        const historicalPrices = timestamps.map((t, i) => ({
-          date: new Date(t * 1000).toISOString().split('T')[0],
-          close: prices[i]
-        })).filter(p => p.close);
+    # Calculer 'DebitCreditIndicator' basé sur la valeur de 'UnitPrice'
+    df_merged['UnitPrice_float'] = pd.to_numeric(df_merged['UnitPrice'], errors='coerce').fillna(0.0)
+    df_merged['DebitCreditIndicator'] = df_merged['UnitPrice_float'].apply(lambda x: 'D' if x < 0 else 'C')
+    
+    # Renommer les colonnes
+    df_output = df_merged.rename(columns={
+        'GJINV#': 'InvoiceNo', 
+        'AHINVD': 'InvoiceDate', 
+        'RDTAXC': 'GoodsServiceID', 
+        # Autres renommages si nécessaire
+    })
 
-        resultsDiv.innerHTML = '';
+    # Créer 'GLPostingDate' en copiant 'GJDTJP' et utiliser 'InvoiceDate' comme valeur par défaut
+    df_output['GLPostingDate'] = df_merged['GJDTJP'].fillna(df_merged['AHINVD'])
 
-        const shares = quote.defaultKeyStatistics?.sharesOutstanding?.raw || null;
-        const income = quote.incomeStatementHistory?.incomeStatementHistory || [];
-        const balance = quote.balanceSheetHistory?.balanceSheetStatements || [];
-        const cashflow = quote.cashflowStatementHistory?.cashflowStatements || [];
-        const priceCurrent = quote.price?.regularMarketPrice?.raw || null;
+    # Créer 'GLPostingDate' en copiant 'GJDTJP' ou 'InvoiceDate' si 'GJDTJP' n'existe pas
+    # if 'GJDTJP' in df_merged.columns:
+    #     df_output['GLPostingDate'] = df_merged['GJDTJP']
+    # else:
+    #     df_output['GLPostingDate'] = df_output['InvoiceDate']
 
-        const perList = [], pbrList = [], pcfList = [], psrList = [];
-        const years = Math.min(income.length, balance.length, cashflow.length, historicalPrices.length);
+    # Créer 'InvoiceLineAmount' en copiant 'UnitPrice'
+    df_output['InvoiceLineAmount'] = df_output['UnitPrice']
 
-        for (let i = 0; i < years; i++) {
-          const net = income[i]?.netIncome?.raw;
-          const equity = balance[i]?.totalStockholderEquity?.raw;
-          const revenue = income[i]?.totalRevenue?.raw || quote.financialData?.totalRevenue?.raw;
-          const operatingCashFlow = cashflow[i]?.totalCashFromOperatingActivities?.raw;
-          const price = historicalPrices[historicalPrices.length - 1 - i]?.close;
+    # Convertir les dates au format AAAA-MM-JJ
+    df_output['InvoiceDate'] = pd.to_datetime(df_output['InvoiceDate'], format='%Y%m%d', errors='coerce').dt.strftime('%Y-%m-%d')
+    df_output['GLPostingDate'] = pd.to_datetime(df_output['GLPostingDate'], format='%Y%m%d', errors='coerce').dt.strftime('%Y-%m-%d')
 
-          if (shares && net && price) perList.push(price / (net / shares));
-          if (shares && equity && price) pbrList.push(price / (equity / shares));
-          if (shares && operatingCashFlow && price) pcfList.push(price / (operatingCashFlow / shares));
-          if (shares && revenue && price) psrList.push(price / (revenue / shares));
-        }
+    # Assurer que les colonnes nécessaires existent
+    necessary_columns = [
+        'InvoiceNo', 'InvoiceDate', 'InvoiceType', 'GLPostingDate', 'LineNumber', 'GoodsServiceID', 'ProductCode', 'UnitPrice', 'Description', 'InvoiceLineAmount', 'DebitCreditIndicator', 'Source'
+    ]
 
-        const perAvg = perList.length ? perList.reduce((a,b)=>a+b)/perList.length : null;
-        const pbrAvg = pbrList.length ? pbrList.reduce((a,b)=>a+b)/pbrList.length : null;
-        const pcfAvg = pcfList.length ? pcfList.reduce((a,b)=>a+b)/pcfList.length : null;
-        const psrAvg = psrList.length ? psrList.reduce((a,b)=>a+b)/psrList.length : null;
+    for col in necessary_columns:
+        if col not in df_output.columns:
+            df_output[col] = ''  # Créer la colonne avec des valeurs vides si elle n'existe pas
 
-        const perNow = quote.summaryDetail?.trailingPE?.raw;
-        const pbrNow = quote.defaultKeyStatistics?.priceToBook?.raw;
-        const pcfNow = quote.defaultKeyStatistics?.priceToCashFlow?.raw;
-        const psrNow = quote.summaryDetail?.priceToSalesTrailing12Months?.raw;
+    # Sélectionner les colonnes finales
+    df_output = df_output[necessary_columns]
 
-        const fairValues = {
-          PER: perAvg && perNow ? (perAvg / perNow) * priceCurrent : null,
-          PCF: pcfAvg && pcfNow ? (pcfAvg / pcfNow) * priceCurrent : null,
-          PSR: psrAvg && psrNow ? (psrAvg / psrNow) * priceCurrent : null,
-          PBR: pbrAvg && pbrNow ? (pbrAvg / pbrNow) * priceCurrent : null
-        };
+    # Écrire le résultat dans le fichier CSV
+    df_output.to_csv(output_file, sep=';', index=False, encoding='utf-8')
 
-        const fairList = Object.values(fairValues).filter(v => typeof v === 'number');
-        const fairAvg = fairList.length ? fairList.reduce((a,b)=>a+b)/fairList.length : null;
-        const upside = fairAvg && priceCurrent ? ((fairAvg / priceCurrent - 1) * 100) : null;
-        const formatVal = v => typeof v === 'number' ? v.toFixed(2) : 'N/A';
+    print(f"    Jointure et écriture terminées. Les résultats sont enregistrés dans {output_file}.")
+    print(f"    Nombre de lignes dans le fichier résultat : {len(df_output)}")
+    print(f"    Nombre de InvoiceNo uniques dans le fichier résultat : {df_output['InvoiceNo'].nunique()}")
 
-        displaySection('📊 Données Générales', {
-          symbole: symbol,
-          nom: quote.price?.longName || "N/A",
-          exchange: quote.price?.exchangeName || "N/A"
-        });
-
-        displaySection('📊 Ratios Financiers Actuels', {
-          PER: formatVal(perNow),
-          PCF: formatVal(pcfNow),
-          PSR: formatVal(psrNow),
-          PBR: formatVal(pbrNow)
-        });
-
-        displaySection('📐 Juste Valeur Estimée - Ratios Historiques', {
-          'Juste Valeur (PER)': formatVal(fairValues.PER),
-          'Juste Valeur (PCF)': formatVal(fairValues.PCF),
-          'Juste Valeur (PSR)': formatVal(fairValues.PSR),
-          'Juste Valeur (PBR)': formatVal(fairValues.PBR),
-          'Moyenne': formatVal(fairAvg),
-          'Potentiel (%)': upside !== null ? `${upside.toFixed(2)}%` : 'N/A'
-        });
-
-        const couleur = upside > 0 ? 'green' : 'red';
-        const potentiel = document.createElement('div');
-        potentiel.className = 'section';
-        potentiel.innerHTML = `<h2 style="color:${couleur}">📈 Potentiel estimé : ${upside?.toFixed(2) || 'N/A'}%</h2>`;
-        resultsDiv.appendChild(potentiel);
-
-        currentChart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: historicalPrices.map(p => p.date),
-            datasets: [{
-              label: `Prix historique (${symbol})`,
-              data: historicalPrices.map(p => p.close),
-              borderColor: 'green',
-              fill: false,
-              tension: 0.1
-            }]
-          }
-        });
-
-      } catch (err) {
-        resultsDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
-      }
-    }
-
-    function displaySection(title, obj) {
-      const section = document.createElement('div');
-      section.className = 'section';
-      const h2 = document.createElement('h2');
-      h2.textContent = title;
-
-      const btn = document.createElement('button');
-      btn.className = 'toggle-btn';
-      btn.textContent = 'Afficher/Masquer';
-
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(obj, null, 2);
-      btn.onclick = () => {
-        pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
-      };
-
-      section.appendChild(h2);
-      section.appendChild(btn);
-      section.appendChild(pre);
-      document.getElementById('results').appendChild(section);
-    }
-
-    function toggleChart() {
-      const chartDiv = document.getElementById('chartContainer');
-      chartDiv.style.display = chartDiv.style.display === 'none' ? 'block' : 'none';
-    }
-  </script>
-</body>
-</html>
+if __name__ == "__main__":
+    traiter_invoices()
