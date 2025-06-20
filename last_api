@@ -163,3 +163,9 @@ def traiter_invoices():
 
 if __name__ == "__main__":
     traiter_invoices()
+
+
+
+    Le fichier XML n'est **pas valide** par rapport au schéma XSD.
+    Ligne 59, Colonne 0: Element '{urn:StandardAuditFile-Taxation-Financial:DK}Customers': Missing child element(s). Expected is ( {urn:StandardAuditFile-Taxation-Financial:DK}Customer ).
+
