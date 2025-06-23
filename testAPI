@@ -1,228 +1,50 @@
-#!/bin/bash
+import xml.etree.ElementTree as ET
+from deepdiff import DeepDiff
 
-set -e
+def xml_to_dict(xml_path):
+    def parse_element(element):
+        parsed = {element.tag: {} if element.attrib else None}
+        children = list(element)
+        if children:
+            dd = {}
+            for dc in map(parse_element, children):
+                for k, v in dc.items():
+                    if k in dd:
+                        if isinstance(dd[k], list):
+                            dd[k].append(v)
+                        else:
+                            dd[k] = [dd[k], v]
+                    else:
+                        dd[k] = v
+            parsed[element.tag] = dd
+        if element.attrib:
+            parsed[element.tag].update(('@' + k, v) for k, v in element.attrib.items())
+        if element.text and element.text.strip():
+            text = element.text.strip()
+            if children or element.attrib:
+                parsed[element.tag]['#text'] = text
+            else:
+                parsed[element.tag] = text
+        return parsed
 
-### Couleurs ###
-GREEN="\033[1;32m"
-RED="\033[1;31m"
-NC="\033[0m" # No Color
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+    return parse_element(root)
 
-echo -e "${GREEN}🚀 Lancement de l'installation du projet...${NC}"
+# Chemins des fichiers
+ancien = "C:/chemin/vers/ancien.xml"
+nouveau = "C:/chemin/vers/nouveau.xml"
 
-### 1. Vérification des prérequis ###
-check_and_install_docker() {
-  if ! command -v docker &> /dev/null; then
-    echo -e "${RED}❌ Docker non installé. Installation...${NC}"
-    curl -fsSL https://get.docker.com | sh
-    sudo usermod -aG docker "$USER"
-    echo -e "${GREEN}✅ Docker installé. Veuillez redémarrer votre session.${NC}"
-  else
-    echo -e "${GREEN}✅ Docker est déjà installé.${NC}"
-  fi
-}
+# Parsing
+xml1 = xml_to_dict(ancien)
+xml2 = xml_to_dict(nouveau)
 
-check_and_install_docker_compose() {
-  if ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}❌ Docker Compose non installé. Installation...${NC}"
-    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-      -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
-    echo -e "${GREEN}✅ Docker Compose installé.${NC}"
-  else
-    echo -e "${GREEN}✅ Docker Compose est déjà installé.${NC}"
-  fi
-}
+# Comparaison
+diff = DeepDiff(xml1, xml2, ignore_order=True)
 
-check_and_install_docker
-check_and_install_docker_compose
-
-### 2. Chargement de l’environnement ###
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
-  echo -e "${GREEN}✅ Fichier .env chargé.${NC}"
-else
-  echo -e "${RED}⚠️  Fichier .env manquant ! Merci d'en créer un avant de continuer.${NC}"
-  exit 1
-fi
-
-### 3. Création des dossiers persistants ###
-mkdir -p data/db data/limesurvey_uploads
-
-### 4. Vérification des fichiers critiques ###
-[ -f docker-compose.yml ] || { echo -e "${RED}❌ docker-compose.yml manquant !${NC}"; exit 1; }
-[ -f python_worker/requirements.txt ] || echo "# requirements" > python_worker/requirements.txt
-[ -f python_worker/main.py ] || echo "print('Hello from worker')" > python_worker/main.py
-
-### 5. Build & Lancement ###
-echo -e "${GREEN}📦 Lancement de docker-compose...${NC}"
-docker-compose up -d --build
-
-### 6. Vérification de l’état des services ###
-check_service() {
-  local name="$1"
-  local status
-  status=$(docker inspect --format='{{.State.Health.Status}}' "$name" 2>/dev/null || echo "unknown")
-  
-  if [ "$status" == "healthy" ] || [ "$status" == "running" ]; then
-    echo -e "${GREEN}✅ Service $name est OK ($status)${NC}"
-  else
-    echo -e "${RED}❌ Service $name en erreur ou inconnu (status: $status)${NC}"
-  fi
-}
-
-echo -e "${GREEN}🔍 Vérification de l'état des conteneurs...${NC}"
-services=$(docker-compose ps -q)
-for id in $services; do
-  name=$(docker inspect --format='{{.Name}}' "$id" | cut -c2-)
-  check_service "$name"
-done
-
-echo -e "${GREEN}🎉 Installation terminée avec succès !${NC}"
-
-
-
-
-
-Parfait. Voici un script install.sh idempotent, professionnel et robuste, adapté à ton dépôt GitLab existant. Il :
-
-Vérifie la présence de Docker et Docker Compose, et les installe si besoin.
-
-Vérifie l’existence des fichiers essentiels (.env, docker-compose.yml, etc.)
-
-Crée les dossiers manquants.
-
-Lance les conteneurs via docker-compose up -d --build.
-
-Vérifie la santé de chaque service.
-
-Est idempotent : il ne refait rien inutilement.
-
-
-
-
-🎯 Objectif
-Créer un fichier .sql contenant l’intégralité de la base de données LimeSurvey, afin de :
-
-Réaliser une sauvegarde manuelle ou automatisée
-
-Migrer la base vers un autre environnement
-
-Conserver un snapshot versionné de l’état de la base
-
-⚙️ Fonctionnement de l’export
-Le script utilise la commande mysqldump pour extraire toute la base, puis :
-
-Vérifie que le dossier db_dumps/ existe, ou le crée.
-
-Génère un fichier .sql horodaté avec la structure :
-
-bash
-Copier
-Modifier
-./db_dumps/limesurvey_db_YYYYMMDD_HHMMSS.sql
-Affiche un message de confirmation en cas de succès ou d’échec.
-
-🧑‍💻 Étapes détaillées pour exécuter un export
-1. Modifier les paramètres de connexion
-Dans le script limesurvey_db.sh, configure les variables :
-
-bash
-Copier
-Modifier
-DB_HOST="localhost"             # Adresse de la base (ex: localhost, 127.0.0.1, ou nom du conteneur Docker)
-DB_PORT="3306"                  # Port MariaDB (3306 par défaut)
-DB_USER="limesurvey_user"       # Utilisateur ayant les droits SELECT sur la base
-DB_PASS="votre_mot_de_passe"    # Mot de passe de l'utilisateur
-DB_NAME="limesurvey_db"         # Nom exact de la base
-DUMP_DIR="./db_dumps"           # Dossier de destination des exports
-2. Exécuter le script
-bash
-Copier
-Modifier
-./limesurvey_db.sh
-3. Choisir l'option "1"
-markdown
-Copier
-Modifier
-=== LimeSurvey DB Script ===
-1. Exporter la base
-2. Importer un dump
-Choix (1/2) : 1
-4. Vérifier le résultat
-Une fois l’opération terminée, tu verras un message du type :
-
-csharp
-Copier
-Modifier
-📤 Export de la base de données 'limesurvey_db' vers './db_dumps/limesurvey_db_20250604_153212.sql'...
-✅ Export réussi.
-📁 Exemple de structure des fichiers après plusieurs exports
-pgsql
-Copier
-Modifier
-db_dumps/
-├── limesurvey_db_20250601_110215.sql
-├── limesurvey_db_20250602_114450.sql
-└── limesurvey_db_20250604_153212.sql
-🛡 Bonnes pratiques
-Sauvegarder avant toute opération critique (import, mise à jour de LimeSurvey…)
-
-Ne jamais exposer ces fichiers en public (ils contiennent potentiellement des données sensibles)
-
-Versionner les dumps dans un dépôt Git privé si besoin de suivi historique
-
-Utiliser un système de rotation si les dumps sont générés automatiquement (pour éviter l’accumulation)
-
-
-
-
-
-fatal: The current branch feature/holding-96 has no upstream branch.
-To push the current branch and set the remote as upstream, use
-
-    git push --set-upstream origin feature/holding-96
-
-
-def merge_csv_files(referentiel_number=95):
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        try:
-            referentiel_number = int(sys.argv[1])
-        except ValueError:
-            print("    Le paramètre doit être un nombre. Utilisation de la valeur par défaut 95.")
-            referentiel_number = 95
-    else:
-        referentiel_number = 95
-
-    merge_csv_files(referentiel_number)
-
-
-
-
-
-    Nombre de lignes dans input5 (./WORKSPACE/JOIN/RACDETFL_ITMMASFL_XD.CSV): 0
-Traceback (most recent call last):
-  File "/home/soufiane/.pyenv/versions/3.11.8/lib/python3.11/site-packages/pandas/core/indexes/base.py", line 3805, in get_loc
-    return self._engine.get_loc(casted_key)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc
-  File "index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc
-  File "pandas/_libs/hashtable_class_helper.pxi", line 7081, in pandas._libs.hashtable.PyObjectHashTable.get_item
-  File "pandas/_libs/hashtable_class_helper.pxi", line 7089, in pandas._libs.hashtable.PyObjectHashTable.get_item
-KeyError: 'RDTYPE'
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/home/soufiane/prjt-loxam-saft/./SCRIPTS/SALESINVOICE.py", line 189, in <module>
-    traiter_invoices()
-  File "/home/soufiane/prjt-loxam-saft/./SCRIPTS/SALESINVOICE.py", line 58, in traiter_invoices
-    df_input3 = df_input3[df_input3['RDTYPE'].isin(['ES', 'RI']) | ((df_input3['RDTYPE'] == 'SI') & (df_input3['RDCATG'] != 0))]
-                          ~~~~~~~~~^^^^^^^^^^
-  File "/home/soufiane/.pyenv/versions/3.11.8/lib/python3.11/site-packages/pandas/core/frame.py", line 4102, in __getitem__
-    indexer = self.columns.get_loc(key)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/soufiane/.pyenv/versions/3.11.8/lib/python3.11/site-packages/pandas/core/indexes/base.py", line 3812, in get_loc
-    raise KeyError(key) from err
-KeyError: 'RDTYPE'
+# Résultat
+if diff:
+    print("❗Différences détectées :")
+    print(diff)
+else:
+    print("✅ Les deux fichiers sont équivalents (structure et contenu).")
