@@ -1,29 +1,43 @@
-from xmldiff import main, formatting
-import datetime
 import os
+from xmldiff import main, formatting
 
-# === Paramètres ===
-file1 = "C:/chemin/vers/fichier1.xml"
-file2 = "C:/chemin/vers/fichier2.xml"
-html_output = "rapport_diff.html"
+# === Répertoires source ===
+dir1 = "C:/chemin/vers/rep1"
+dir2 = "C:/chemin/vers/rep2"
 
-# === Formatage verbeux (texte brut) ===
+# === Formatter en texte clair, verbeux ===
 formatter = formatting.DiffFormatter(normalize=formatting.WS_BOTH)
 
-# === Comparaison avec options ===
-diff = main.diff_files(
-    file1,
-    file2,
-    formatter=formatter,
-    fast_match=False,
-    uniqueattrs=["id"],
-    ratio_mode=True
-)
+# === Lister les fichiers communs (par nom) ===
+fichiers1 = set(f for f in os.listdir(dir1) if f.endswith(".xml"))
+fichiers2 = set(f for f in os.listdir(dir2) if f.endswith(".xml"))
+fichiers_communs = sorted(fichiers1 & fichiers2)
 
-# === Affichage en console ===
-if diff:
-    print("❗ Différences détectées :\n")
-    for line in diff:
-        print("•", line)
-else:
-    print("✅ Aucun changement détecté.")
+if not fichiers_communs:
+    print("❗ Aucun fichier XML commun trouvé entre les deux répertoires.")
+    exit()
+
+# === Comparaison fichier par fichier ===
+for fichier in fichiers_communs:
+    path1 = os.path.join(dir1, fichier)
+    path2 = os.path.join(dir2, fichier)
+
+    print(f"\n🔍 Comparaison de : {fichier}")
+    try:
+        diff = main.diff_files(
+            path1, path2,
+            formatter=formatter,
+            fast_match=False,
+            uniqueattrs=["id"],
+            ratio_mode=True
+        )
+
+        if diff:
+            print("❗ Différences détectées :")
+            for line in diff:
+                print("  •", line)
+        else:
+            print("✅ Aucun changement détecté.")
+
+    except Exception as e:
+        print(f"❌ Erreur lors de la comparaison de {fichier} : {e}")
