@@ -1,50 +1,29 @@
-import xml.etree.ElementTree as ET
-from deepdiff import DeepDiff
+from xmldiff import main, formatting
+import datetime
+import os
 
-def xml_to_dict(xml_path):
-    def parse_element(element):
-        parsed = {element.tag: {} if element.attrib else None}
-        children = list(element)
-        if children:
-            dd = {}
-            for dc in map(parse_element, children):
-                for k, v in dc.items():
-                    if k in dd:
-                        if isinstance(dd[k], list):
-                            dd[k].append(v)
-                        else:
-                            dd[k] = [dd[k], v]
-                    else:
-                        dd[k] = v
-            parsed[element.tag] = dd
-        if element.attrib:
-            parsed[element.tag].update(('@' + k, v) for k, v in element.attrib.items())
-        if element.text and element.text.strip():
-            text = element.text.strip()
-            if children or element.attrib:
-                parsed[element.tag]['#text'] = text
-            else:
-                parsed[element.tag] = text
-        return parsed
+# === Paramètres ===
+file1 = "C:/chemin/vers/fichier1.xml"
+file2 = "C:/chemin/vers/fichier2.xml"
+html_output = "rapport_diff.html"
 
-    tree = ET.parse(xml_path)
-    root = tree.getroot()
-    return parse_element(root)
+# === Formatage verbeux (texte brut) ===
+formatter = formatting.DiffFormatter(normalize=formatting.WS_BOTH)
 
-# Chemins des fichiers
-ancien = "C:/chemin/vers/ancien.xml"
-nouveau = "C:/chemin/vers/nouveau.xml"
+# === Comparaison avec options ===
+diff = main.diff_files(
+    file1,
+    file2,
+    formatter=formatter,
+    fast_match=False,
+    uniqueattrs=["id"],
+    ratio_mode=True
+)
 
-# Parsing
-xml1 = xml_to_dict(ancien)
-xml2 = xml_to_dict(nouveau)
-
-# Comparaison
-diff = DeepDiff(xml1, xml2, ignore_order=True)
-
-# Résultat
+# === Affichage en console ===
 if diff:
-    print("❗Différences détectées :")
-    print(diff)
+    print("❗ Différences détectées :\n")
+    for line in diff:
+        print("•", line)
 else:
-    print("✅ Les deux fichiers sont équivalents (structure et contenu).")
+    print("✅ Aucun changement détecté.")
