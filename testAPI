@@ -8,3 +8,7 @@ with open("donnees_utf8.csv", 'r', newline='', encoding='utf-8') as f:
                        ^^^^^^^^^^^^^^^^^
   File "<frozen codecs>", line 322, in decode
 UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc6 in position 50: invalid continuation byte
+
+
+csv_files = glob.glob(f'./INPUT/header_{referentiel_number}*.csv')
+
