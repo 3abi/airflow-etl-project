@@ -1,43 +1,10 @@
-import os
-from xmldiff import main, formatting
 
-# === Répertoires source ===
-dir1 = "C:/chemin/vers/rep1"
-dir2 = "C:/chemin/vers/rep2"
+with open("donnees_utf8.csv", 'r', newline='', encoding='utf-8') as f:
+    reader = csv.DictReader(f, delimiter=';')
 
-# === Formatter en texte clair, verbeux ===
-formatter = formatting.DiffFormatter(normalize=formatting.WS_BOTH)
 
-# === Lister les fichiers communs (par nom) ===
-fichiers1 = set(f for f in os.listdir(dir1) if f.endswith(".xml"))
-fichiers2 = set(f for f in os.listdir(dir2) if f.endswith(".xml"))
-fichiers_communs = sorted(fichiers1 & fichiers2)
-
-if not fichiers_communs:
-    print("❗ Aucun fichier XML commun trouvé entre les deux répertoires.")
-    exit()
-
-# === Comparaison fichier par fichier ===
-for fichier in fichiers_communs:
-    path1 = os.path.join(dir1, fichier)
-    path2 = os.path.join(dir2, fichier)
-
-    print(f"\n🔍 Comparaison de : {fichier}")
-    try:
-        diff = main.diff_files(
-            path1, path2,
-            formatter=formatter,
-            fast_match=False,
-            uniqueattrs=["id"],
-            ratio_mode=True
-        )
-
-        if diff:
-            print("❗ Différences détectées :")
-            for line in diff:
-                print("  •", line)
-        else:
-            print("✅ Aucun changement détecté.")
-
-    except Exception as e:
-        print(f"❌ Erreur lors de la comparaison de {fichier} : {e}")
+ File "/home/soufiane/.pyenv/versions/3.11.8/lib/python3.11/csv.py", line 97, in fieldnames
+    self._fieldnames = next(self.reader)
+                       ^^^^^^^^^^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc6 in position 50: invalid continuation byte
