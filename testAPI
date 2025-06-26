@@ -12,3 +12,16 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc6 in position 50: invalid
 
 csv_files = glob.glob(f'./INPUT/header_{referentiel_number}*.csv')
 
+
+
+
+
+20250626-125435 traitement ASSET_step5
+/home/soufiane/prjt-loxam-saft/./SCRIPTS/ASSET_step5.py:39: FutureWarning: The behavior of array concatenation with empty entries is deprecated. In a future version, this will no longer exclude empty items when determining the result dtype. To retain the old behavior, exclude the empty entries before the concat operation.
+  asset_df['AcquisitionAndProductionCostsBegin'] = asset_df['FHBACB_min'].combine_first(asset_df['FHBACA_def'])
+/home/soufiane/prjt-loxam-saft/./SCRIPTS/ASSET_step5.py:49: FutureWarning: The behavior of array concatenation with empty entries is deprecated. In a future version, this will no longer exclude empty items when determining the result dtype. To retain the old behavior, exclude the empty entries before the concat operation.
+  asset_df['AcquisitionAndProductionCostsEnd'] = asset_df['FHBACA_max'].combine_first(asset_df['FHBACA_def'])
+    Fichier généré : ./WORKSPACE/TRANSFO/ASSET.CSV
+
+
+
