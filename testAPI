@@ -1,27 +1,79 @@
-
-with open("donnees_utf8.csv", 'r', newline='', encoding='utf-8') as f:
-    reader = csv.DictReader(f, delimiter=';')
-
-
- File "/home/soufiane/.pyenv/versions/3.11.8/lib/python3.11/csv.py", line 97, in fieldnames
-    self._fieldnames = next(self.reader)
-                       ^^^^^^^^^^^^^^^^^
-  File "<frozen codecs>", line 322, in decode
-UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc6 in position 50: invalid continuation byte
-
-
-csv_files = glob.glob(f'./INPUT/header_{referentiel_number}*.csv')
-
-
+# TNR méthode 2
+# definir les reps des deux versions + recu^èrer tous les fichiers (xml csv logs ...) + sous dossiers aussi
+# préciser quel type de fichiers à comparer
+# un bilan stats descriptifs : 
+# 1. l'existence du fichier dans les deux dossiers 
+# 2. taille des fichiers
+#
+# un bilan détailé selon la méthode générique :
+# . Methode 2 
+#  Un bilan spècifique pr les XMLs :
+#  . Méthode 1
+# un script global qui fait les deux méthodes (1 & 2) : implimente cette approche 
+# 
 
 
+# 
+# 
 
-20250626-125435 traitement ASSET_step5
-/home/soufiane/prjt-loxam-saft/./SCRIPTS/ASSET_step5.py:39: FutureWarning: The behavior of array concatenation with empty entries is deprecated. In a future version, this will no longer exclude empty items when determining the result dtype. To retain the old behavior, exclude the empty entries before the concat operation.
-  asset_df['AcquisitionAndProductionCostsBegin'] = asset_df['FHBACB_min'].combine_first(asset_df['FHBACA_def'])
-/home/soufiane/prjt-loxam-saft/./SCRIPTS/ASSET_step5.py:49: FutureWarning: The behavior of array concatenation with empty entries is deprecated. In a future version, this will no longer exclude empty items when determining the result dtype. To retain the old behavior, exclude the empty entries before the concat operation.
-  asset_df['AcquisitionAndProductionCostsEnd'] = asset_df['FHBACA_max'].combine_first(asset_df['FHBACA_def'])
-    Fichier généré : ./WORKSPACE/TRANSFO/ASSET.CSV
+file1 = "toto"
+file2 = "tata"
+
+# trier les lignes de chaque fichier (sublime_text)
+file1_sorted = sublime_text.exe file1 sort_lines()
+file2_sorted = sublime_text.exe file2 sort_lines()
+
+# comparer les fichiers ainsi triés
+report = winmerge.exe file1_sorted file2_sorted
 
 
 
+
+
+import os
+from xmldiff import main
+import sys
+
+
+# méthode 1
+
+
+# Rediriger les prints vers un fichier
+sys.stdout = open('C:/LOXAM/last_sortie.txt', 'w')
+
+
+# === Répertoires source ===
+dir1 = "C:/LOXAM/XML_sections_V1_1mois/"
+dir2 = "C:/LOXAM/XML_sections_V2_1mois/"
+
+# === Lister les fichiers communs (par nom) ===
+fichiers1 = set(f for f in os.listdir(dir1) if f.endswith(".xml"))
+fichiers2 = set(f for f in os.listdir(dir2) if f.endswith(".xml"))
+fichiers_communs = sorted(fichiers1 & fichiers2)
+
+if not fichiers_communs:
+    print("Aucun fichier XML commun trouvé entre les deux répertoires.")
+    exit()
+
+# === Comparaison fichier par fichier ===
+for fichier in fichiers_communs:
+    path1 = os.path.join(dir1, fichier)
+    path2 = os.path.join(dir2, fichier)
+    
+    print(f"chemin fichier_dir1: {path1}")
+    print(f"chemin fichier_dir2: {path2}")
+
+    print(f"\nComparaison de : {fichier}")
+    try:
+        # 
+        diff = main.diff_files(path1, path2, diff_options={'F': 1, 'ratio_mode': 'accurate'})
+
+        if diff:
+            print("Différences détectées :")
+            for line in diff:
+                print("  •", line)
+        else:
+            print("Aucun changement détecté.")
+
+    except Exception as e:
+        print(f"Erreur lors de la comparaison de {fichier} : {e}")
