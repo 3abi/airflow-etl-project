@@ -1,79 +1,104 @@
-# TNR méthode 2
-# definir les reps des deux versions + recu^èrer tous les fichiers (xml csv logs ...) + sous dossiers aussi
-# préciser quel type de fichiers à comparer
-# un bilan stats descriptifs : 
-# 1. l'existence du fichier dans les deux dossiers 
-# 2. taille des fichiers
-#
-# un bilan détailé selon la méthode générique :
-# . Methode 2 
-#  Un bilan spècifique pr les XMLs :
-#  . Méthode 1
-# un script global qui fait les deux méthodes (1 & 2) : implimente cette approche 
-# 
-
-
-# 
-# 
-
-file1 = "toto"
-file2 = "tata"
-
-# trier les lignes de chaque fichier (sublime_text)
-file1_sorted = sublime_text.exe file1 sort_lines()
-file2_sorted = sublime_text.exe file2 sort_lines()
-
-# comparer les fichiers ainsi triés
-report = winmerge.exe file1_sorted file2_sorted
-
-
-
-
-
 import os
-from xmldiff import main
-import sys
+import subprocess
+from xmldiff import main as xmldiff_main
 
+# === CONFIG ===
+DIR1 = r"C:/LOXAM/Version1"
+DIR2 = r"C:/LOXAM/Version2"
+OUTPUT_DIR = r"C:/LOXAM/TNR_RESULTS"
+SORTED_DIR = os.path.join(OUTPUT_DIR, "sorted_files")
+REPORT_FILE = os.path.join(OUTPUT_DIR, "report_global.txt")
+os.makedirs(SORTED_DIR, exist_ok=True)
 
-# méthode 1
+EXTENSIONS = [".xml", ".csv", ".log"]
 
+# === UTILS ===
+def list_all_files(base_dir):
+    file_paths = []
+    for root, _, files in os.walk(base_dir):
+        for f in files:
+            if any(f.endswith(ext) for ext in EXTENSIONS):
+                relative_path = os.path.relpath(os.path.join(root, f), base_dir)
+                file_paths.append(relative_path)
+    return sorted(file_paths)
 
-# Rediriger les prints vers un fichier
-sys.stdout = open('C:/LOXAM/last_sortie.txt', 'w')
+def get_file_size(path):
+    return os.path.getsize(path) if os.path.exists(path) else 0
 
+def sort_file(input_file, output_file):
+    """Appelle Sublime Text en ligne de commande pour trier les lignes (exemple générique)."""
+    # Ici on simule : utilise `sort` natif Windows à la place si besoin
+    with open(input_file, 'r') as f:
+        lines = f.readlines()
+    with open(output_file, 'w') as f:
+        for line in sorted(lines):
+            f.write(line)
 
-# === Répertoires source ===
-dir1 = "C:/LOXAM/XML_sections_V1_1mois/"
-dir2 = "C:/LOXAM/XML_sections_V2_1mois/"
+def run_winmerge(file1, file2):
+    """Lance WinMerge en ligne de commande"""
+    subprocess.run(['WinMergeU.exe', file1, file2])
 
-# === Lister les fichiers communs (par nom) ===
-fichiers1 = set(f for f in os.listdir(dir1) if f.endswith(".xml"))
-fichiers2 = set(f for f in os.listdir(dir2) if f.endswith(".xml"))
-fichiers_communs = sorted(fichiers1 & fichiers2)
+# === TNR ===
+with open(REPORT_FILE, 'w') as report:
 
-if not fichiers_communs:
-    print("Aucun fichier XML commun trouvé entre les deux répertoires.")
-    exit()
+    # --- Index tous les fichiers ---
+    files1 = set(list_all_files(DIR1))
+    files2 = set(list_all_files(DIR2))
+    all_files = sorted(files1 | files2)
 
-# === Comparaison fichier par fichier ===
-for fichier in fichiers_communs:
-    path1 = os.path.join(dir1, fichier)
-    path2 = os.path.join(dir2, fichier)
-    
-    print(f"chemin fichier_dir1: {path1}")
-    print(f"chemin fichier_dir2: {path2}")
+    # --- Bilan statistique ---
+    report.write("=== BILAN STATISTIQUE ===\n")
+    for rel_path in all_files:
+        f1 = os.path.join(DIR1, rel_path)
+        f2 = os.path.join(DIR2, rel_path)
+        exists1 = os.path.exists(f1)
+        exists2 = os.path.exists(f2)
+        size1 = get_file_size(f1)
+        size2 = get_file_size(f2)
+        report.write(f"{rel_path} | Exists V1: {exists1} | Exists V2: {exists2} | Size V1: {size1} | Size V2: {size2}\n")
+    report.write("\n")
 
-    print(f"\nComparaison de : {fichier}")
-    try:
-        # 
-        diff = main.diff_files(path1, path2, diff_options={'F': 1, 'ratio_mode': 'accurate'})
+    # --- Comparaison générique (Méthode 2) ---
+    report.write("=== BILAN DETAILLE METHODE 2 ===\n")
+    for rel_path in all_files:
+        ext = os.path.splitext(rel_path)[1].lower()
+        if not any(rel_path.endswith(ext) for ext in EXTENSIONS):
+            continue
 
-        if diff:
-            print("Différences détectées :")
-            for line in diff:
-                print("  •", line)
-        else:
-            print("Aucun changement détecté.")
+        f1 = os.path.join(DIR1, rel_path)
+        f2 = os.path.join(DIR2, rel_path)
 
-    except Exception as e:
-        print(f"Erreur lors de la comparaison de {fichier} : {e}")
+        if os.path.exists(f1) and os.path.exists(f2):
+            sorted1 = os.path.join(SORTED_DIR, rel_path.replace(os.sep, "_") + "_v1_sorted.txt")
+            sorted2 = os.path.join(SORTED_DIR, rel_path.replace(os.sep, "_") + "_v2_sorted.txt")
+            os.makedirs(os.path.dirname(sorted1), exist_ok=True)
+
+            sort_file(f1, sorted1)
+            sort_file(f2, sorted2)
+
+            # Tu peux commenter pour exécuter WinMerge manuellement ou auto :
+            report.write(f"Comparaison générique de : {rel_path}\n")
+            run_winmerge(sorted1, sorted2)
+            report.write(f" => WinMerge called on sorted files.\n")
+    report.write("\n")
+
+    # --- Comparaison XML spécifique (Méthode 1) ---
+    report.write("=== BILAN DETAILLE XML METHODE 1 ===\n")
+    xml_files = [f for f in all_files if f.endswith(".xml")]
+    for rel_path in xml_files:
+        f1 = os.path.join(DIR1, rel_path)
+        f2 = os.path.join(DIR2, rel_path)
+
+        if os.path.exists(f1) and os.path.exists(f2):
+            report.write(f"Comparaison XML : {rel_path}\n")
+            try:
+                diff = xmldiff_main.diff_files(f1, f2)
+                if diff:
+                    for d in diff:
+                        report.write(f"  • {d}\n")
+                else:
+                    report.write("  Aucun changement détecté.\n")
+            except Exception as e:
+                report.write(f"  Erreur XML diff: {e}\n")
+
+print(f"\n✅ TNR terminé. Voir {REPORT_FILE}")
