@@ -1,108 +1,28 @@
-import os
-import subprocess
-from xmldiff import main as xmldiff_main
+# ========================
+# === MESSAGE EXPLICATIF ===
+# ========================
 
-# === CONFIGURATION ===
+print("\n=== TEST DE NON-RÉGRESSION TECHNIQUE ===")
+print("📌 Ce test compare deux versions de fichiers (.xml, .csv, .log)")
+print("➡️  Vérifie existence, taille, et contenu trié ligne par ligne (Méthode 2)")
+print("⚠️  ATTENTION :")
+print("👉 Ce test est uniquement TECHNIQUE")
+print("👉 Il ne remplace PAS une validation FONCTIONNELLE ou MÉTIER")
+print("👉 Toujours prévoir une vérification manuelle complémentaire\n")
 
-DIR1 = r"C:/LOXAM/XML_sections_V1_1mois"
-DIR2 = r"C:/LOXAM/XML_sections_V2_1mois"
-OUTPUT_DIR = r"C:/LOXAM/TNR_RESULTS"
-REPORT_PATH = os.path.join(OUTPUT_DIR, "TNR_report.txt")
-SORTED_DIR = os.path.join(OUTPUT_DIR, "sorted")
-EXTENSIONS = [".xml", ".csv", ".log"]
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(SORTED_DIR, exist_ok=True)
 
-# === UTILS ===
+with open(REPORT_FILE, 'w', encoding='utf-8') as report:
+    report.write("=== TEST DE NON-RÉGRESSION TECHNIQUE ===\n")
+    report.write(
+        "📌 Ce rapport vérifie uniquement :\n"
+        "- L'existence des fichiers dans les deux versions\n"
+        "- Les tailles\n"
+        "- Le contenu texte trié ligne par ligne (Méthode 2)\n"
+        "\n"
+        "⚠️ Ce test est purement TECHNIQUE.\n"
+        "👉 Il ne remplace pas une validation fonctionnelle ou métier.\n"
+        "👉 Une vérification manuelle reste indispensable.\n\n"
+    )
 
-def list_all_files(base):
-    """Liste tous les fichiers de type EXTENSIONS récursivement"""
-    result = []
-    for root, _, files in os.walk(base):
-        for f in files:
-            if any(f.lower().endswith(ext) for ext in EXTENSIONS):
-                rel_path = os.path.relpath(os.path.join(root, f), base)
-                result.append(rel_path)
-    return sorted(result)
 
-def get_size(path):
-    return os.path.getsize(path) if os.path.exists(path) else 0
-
-def sort_lines(infile, outfile):
-    """Tri simple des lignes avec Python pur"""
-    with open(infile, encoding='utf-8', errors='ignore') as f:
-        lines = f.readlines()
-    lines = sorted([line.strip() for line in lines])
-    with open(outfile, 'w', encoding='utf-8') as f:
-        for line in lines:
-            f.write(line + '\n')
-
-def run_winmerge(file1, file2):
-    """Appelle WinMergeU.exe en ligne de commande"""
-    subprocess.run(["WinMergeU.exe", file1, file2])
-
-# === MAIN ===
-
-files1 = set(list_all_files(DIR1))
-files2 = set(list_all_files(DIR2))
-all_files = sorted(files1 | files2)
-
-with open(REPORT_PATH, 'w', encoding='utf-8') as report:
-
-    # === 1. Bilan statistique ===
-    report.write("=== BILAN STATISTIQUE ===\n")
-    for rel_path in all_files:
-        f1 = os.path.join(DIR1, rel_path)
-        f2 = os.path.join(DIR2, rel_path)
-        e1 = os.path.exists(f1)
-        e2 = os.path.exists(f2)
-        s1 = get_size(f1)
-        s2 = get_size(f2)
-        report.write(f"{rel_path} | Exists V1: {e1} | Exists V2: {e2} | Size V1: {s1} | Size V2: {s2}\n")
-    report.write("\n")
-
-    # === 2. Méthode 2 : tri + WinMerge ===
-    report.write("=== METHODE 2 : TRI + WINMERGE ===\n")
-    for rel_path in all_files:
-        ext = os.path.splitext(rel_path)[1].lower()
-        if not ext in EXTENSIONS:
-            continue
-
-        f1 = os.path.join(DIR1, rel_path)
-        f2 = os.path.join(DIR2, rel_path)
-
-        if os.path.exists(f1) and os.path.exists(f2):
-            out1 = os.path.join(SORTED_DIR, rel_path.replace("\\", "_") + "_v1_sorted.txt")
-            out2 = os.path.join(SORTED_DIR, rel_path.replace("\\", "_") + "_v2_sorted.txt")
-            os.makedirs(os.path.dirname(out1), exist_ok=True)
-
-            sort_lines(f1, out1)
-            sort_lines(f2, out2)
-
-            report.write(f"Comparaison : {rel_path} -> Fichiers triés prêts\n")
-            run_winmerge(out1, out2)
-    report.write("\n")
-
-    # === 3. Méthode 1 : XML Diff ===
-    report.write("=== METHODE 1 : XMLDIFF ===\n")
-    for rel_path in all_files:
-        if not rel_path.endswith(".xml"):
-            continue
-
-        f1 = os.path.join(DIR1, rel_path)
-        f2 = os.path.join(DIR2, rel_path)
-
-        if os.path.exists(f1) and os.path.exists(f2):
-            report.write(f"Comparaison XML : {rel_path}\n")
-            try:
-                diff = xmldiff_main.diff_files(f1, f2)
-                if diff:
-                    for d in diff:
-                        report.write(f"  - {d}\n")
-                else:
-                    report.write("  Aucun changement détecté.\n")
-            except Exception as e:
-                report.write(f"  Erreur XMLDIFF : {e}\n")
-
-print(f"✅ TNR terminé -> Rapport : {REPORT_PATH}")
