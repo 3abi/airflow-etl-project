@@ -1,29 +1,24 @@
 import os
 import subprocess
-from xmldiff import main as xmldiff_main
-
 
 # ========================
 # === MESSAGE EXPLICATIF ===
 # ========================
 
-print("\n=== TEST DE NON-RÉGRESSION TECHNIQUE ===")
-print("📌 Ce test compare deux versions de fichiers (.xml, .csv, .log)")
-print("➡️  Vérifie existence, taille, et contenu trié ligne par ligne")
-print("⚠️  ATTENTION :")
-print("👉 Ce test est uniquement TECHNIQUE")
-print("👉 Il ne remplace PAS une validation FONCTIONNELLE ou MÉTIER")
-print("👉 Toujours prévoir une vérification manuelle complémentaire\n")
-
-
+print("\n=== TEST DE NON-REGRESSION TECHNIQUE ===")
+print("[INFO] Ce test compare deux versions de fichiers (.xml, .csv, .log)")
+print("[INFO] Vérifie existence, taille et contenu trié ligne par ligne")
+print("[ATTENTION] Ce test est uniquement TECHNIQUE")
+print("[ATTENTION] Il ne remplace PAS une validation FONCTIONNELLE ou METIER")
+print("[ATTENTION] Une vérification manuelle reste indispensable\n")
 
 # === CONFIG ===
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-print(ROOT_DIR)
+print(f"[INFO] ROOT_DIR : {ROOT_DIR}")
 
 INPUT_VERSION_1 = "INPUT/Resultats_95_V1"
 INPUT_VERSION_2 = "INPUT/Resultats_95_V2"
-TNR_TOOLKIT = os.path.join(ROOT_DIR, "utils") 
+TNR_TOOLKIT = os.path.join(ROOT_DIR, "utils")
 
 DIR1 = os.path.join(ROOT_DIR, INPUT_VERSION_1)
 DIR2 = os.path.join(ROOT_DIR, INPUT_VERSION_2)
@@ -40,18 +35,16 @@ os.makedirs(TNR_TOOLKIT, exist_ok=True)
 
 EXTENSIONS = [".xml", ".csv", ".log"]
 
-
 if not os.path.exists(WINMERGE_EXE):
-    raise FileNotFoundError(f"winMergeU.exe introuvable : {WINMERGE_EXE}")
-
+    raise FileNotFoundError(f"[ERREUR] WinMergeU.exe introuvable : {WINMERGE_EXE}")
 
 # === UTILS ===
 def list_all_files(base_dir):
     file_paths = []
     for root, _, files in os.walk(base_dir):
         for f in files:
-            f = f.lower()
-            if any(f.endswith(ext) for ext in EXTENSIONS):
+            f_clean = f.lower()
+            if any(f_clean.endswith(ext) for ext in EXTENSIONS):
                 relative_path = os.path.relpath(os.path.join(root, f), base_dir)
                 file_paths.append(relative_path)
     return sorted(file_paths)
@@ -60,41 +53,36 @@ def get_file_size(path):
     return os.path.getsize(path) if os.path.exists(path) else 0
 
 def sort_file(input_file, output_file):
-    """Appelle Sublime Text en ligne de commande pour trier les lignes (exemple générique)."""
-    with open(input_file, 'r') as f:
+    """Trie les lignes d'un fichier en UTF-8."""
+    with open(input_file, 'r', encoding='utf-8', errors='ignore') as f:
         lines = f.readlines()
-    with open(output_file, 'w') as f:
+    with open(output_file, 'w', encoding='utf-8') as f:
         for line in sorted(lines):
             f.write(line)
 
 def run_winmerge(file1, file2):
-    """Lance WinMerge en ligne de commande"""
+    """Lance WinMerge en ligne de commande."""
     subprocess.run([WINMERGE_EXE, file1, file2])
 
 # === TNR ===
-with open(REPORT_FILE, 'w') as report:
+with open(REPORT_FILE, 'w', encoding='utf-8') as report:
 
-    # --- Index tous les fichiers ---
     files1 = set(list_all_files(DIR1))
     files2 = set(list_all_files(DIR2))
     all_files = sorted(files1 | files2)
 
-
-    #  ----  Rapport  ----
-    report.write("=== TEST DE NON-RÉGRESSION TECHNIQUE ===\n")
+    report.write("=== TEST DE NON-REGRESSION TECHNIQUE ===\n")
     report.write(
         "Ce rapport vérifie uniquement :\n"
         "- L'existence des fichiers dans les deux versions\n"
         "- Les tailles\n"
         "- Le contenu texte trié ligne par ligne\n"
         "\n"
-        "Ce test est purement TECHNIQUE.\n"
+        "ATTENTION : Test purement TECHNIQUE.\n"
         "Il ne remplace pas une validation fonctionnelle ou métier.\n"
         "Une vérification manuelle reste indispensable.\n\n"
     )
 
-
-    # --- Bilan statistique ---
     report.write("=== BILAN STATISTIQUE ===\n")
     for rel_path in all_files:
         f1 = os.path.join(DIR1, rel_path)
@@ -106,7 +94,6 @@ with open(REPORT_FILE, 'w') as report:
         report.write(f"{rel_path} | Exists V1: {exists1} | Exists V2: {exists2} | Size V1: {size1} | Size V2: {size2}\n")
     report.write("\n")
 
-    # --- Comparaison générique (Méthode 2) ---
     report.write("=== BILAN DETAILLE METHODE 2 ===\n")
     for rel_path in all_files:
         ext = os.path.splitext(rel_path)[1].lower()
@@ -124,29 +111,9 @@ with open(REPORT_FILE, 'w') as report:
             sort_file(f1, sorted1)
             sort_file(f2, sorted2)
 
-            # Tu peux commenter pour exécuter WinMerge manuellement ou auto :
             report.write(f"Comparaison générique de : {rel_path}\n")
             run_winmerge(sorted1, sorted2)
-            report.write(f" => WinMerge called on sorted files.\n")
+            report.write(f" => WinMerge appelé sur fichiers triés.\n")
     report.write("\n")
 
-    # --- Comparaison XML spécifique (Méthode 1) ---
-    # report.write("=== BILAN DETAILLE XML METHODE 1 ===\n")
-    # xml_files = [f for f in all_files if f.endswith(".xml")]
-    # for rel_path in xml_files:
-    #     f1 = os.path.join(DIR1, rel_path)
-    #     f2 = os.path.join(DIR2, rel_path)
-
-    #     if os.path.exists(f1) and os.path.exists(f2):
-    #         report.write(f"Comparaison XML : {rel_path}\n")
-    #         try:
-    #             diff = xmldiff_main.diff_files(f1, f2, diff_options={'F': 1, 'ratio_mode': 'accurate'})
-    #             if diff:
-    #                 for d in diff:
-    #                     report.write(f"  • {d}\n")
-    #             else:
-    #                 report.write("  Aucun changement détecté.\n")
-    #         except Exception as e:
-    #             report.write(f"  Erreur XML diff: {e}\n")
-
-print(f"\n✅ TNR terminé. Voir {REPORT_FILE}")
+print(f"\n✅ TNR terminé. Rapport : {REPORT_FILE}")
