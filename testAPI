@@ -1,1 +1,6 @@
 UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f4cc' in position 0: character maps to <undefined>
+
+
+Dans le cadre de la mise à disposition du fichier SAAA pour la production électronique des déclarations fiscales, LOLO souhaite implémenter une solution capable de générer semi-automatiquement les échanges des données comptables issues de l’ERP RentalMan avec les autorités fiscales. LOLO recherche une solution simple pour répondre d’abord aux exigences de l’administration fiscale NORVEG. 
+
+
