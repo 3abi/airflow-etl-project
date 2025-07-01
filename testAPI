@@ -1,90 +1,152 @@
-Tags recommandés
-🔑 Domaine / Secteur
+import os
+import subprocess
+from xmldiff import main as xmldiff_main
 
-#FiscalitéÉlectronique
 
-#ConformitéFiscale
+# ========================
+# === MESSAGE EXPLICATIF ===
+# ========================
 
-#ERPIntegration
-
-#RentalMan
-
-#SAFT
-
-#Norvège
-
-#ReportingFiscal
-
-#FinanceEtComptabilité
-
-🔑 Expertise / Offre
-
-#DataEngineering
-
-#DataQuality
-
-#GouvernanceDesDonnées
-
-#AcculturationData
-
-#AutomatisationDesFlux
-
-#ArchitectureData
-
-#DataCompliance
-
-#ExportComptable
-
-#TransformationDigitale
-
-#DigitalisationFiscalité
-
-#AuditDonnées
-
-🔑 Type de projet
-
-#MiseEnConformité
-
-#ProjetPilote
-
-#ModuleSAFT
-
-#TimeToMarket
-
-#FluxAutomatisés
-
-#ConsultingData
-
-#ConseilStratégieData
-
-🔑 Gains / Objectifs
-
-#RéductionDesRisques
-
-#FiabilisationDesDonnées
-
-#OptimisationProcessus
-
-#SécurisationDesEchanges
-
-#Traçabilité
-
-#MaturitéData
-
-#TransfertDeCompétences
+print("\n=== TEST DE NON-RÉGRESSION TECHNIQUE ===")
+print("📌 Ce test compare deux versions de fichiers (.xml, .csv, .log)")
+print("➡️  Vérifie existence, taille, et contenu trié ligne par ligne")
+print("⚠️  ATTENTION :")
+print("👉 Ce test est uniquement TECHNIQUE")
+print("👉 Il ne remplace PAS une validation FONCTIONNELLE ou MÉTIER")
+print("👉 Toujours prévoir une vérification manuelle complémentaire\n")
 
 
 
-Dans le cadre de la mise à disposition du fichier SAF-T pour la production électronique des déclarations fiscales, LOLO souhaite implémenter une solution capable de générer semi-automatiquement les échanges des données comptables issues de l’ERP RentalMan avec les autorités fiscales. LOLO recherche une solution simple pour répondre d’abord aux exigences de l’administration fiscale NORVEG.  
+# === CONFIG ===
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print(ROOT_DIR)
+
+INPUT_VERSION_1 = "INPUT/Resultats_95_V1"
+INPUT_VERSION_2 = "INPUT/Resultats_95_V2"
+TNR_TOOLKIT = os.path.join(ROOT_DIR, "utils") 
+
+DIR1 = os.path.join(ROOT_DIR, INPUT_VERSION_1)
+DIR2 = os.path.join(ROOT_DIR, INPUT_VERSION_2)
+OUTPUT_DIR = os.path.join(ROOT_DIR, "TNR_RESULTS")
+SORTED_DIR = os.path.join(OUTPUT_DIR, "SORTED_FILES")
+REPORT_FILE = os.path.join(OUTPUT_DIR, "report_global.txt")
+WINMERGE_EXE = os.path.join(TNR_TOOLKIT, "WinMergeU.exe")
+
+os.makedirs(DIR1, exist_ok=True)
+os.makedirs(DIR2, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(SORTED_DIR, exist_ok=True)
+os.makedirs(TNR_TOOLKIT, exist_ok=True)
+
+EXTENSIONS = [".xml", ".csv", ".log"]
 
 
+if not os.path.exists(WINMERGE_EXE):
+    raise FileNotFoundError(f"winMergeU.exe introuvable : {WINMERGE_EXE}")
 
 
+# === UTILS ===
+def list_all_files(base_dir):
+    file_paths = []
+    for root, _, files in os.walk(base_dir):
+        for f in files:
+            f = f.lower()
+            if any(f.endswith(ext) for ext in EXTENSIONS):
+                relative_path = os.path.relpath(os.path.join(root, f), base_dir)
+                file_paths.append(relative_path)
+    return sorted(file_paths)
+
+def get_file_size(path):
+    return os.path.getsize(path) if os.path.exists(path) else 0
+
+def sort_file(input_file, output_file):
+    """Appelle Sublime Text en ligne de commande pour trier les lignes (exemple générique)."""
+    with open(input_file, 'r') as f:
+        lines = f.readlines()
+    with open(output_file, 'w') as f:
+        for line in sorted(lines):
+            f.write(line)
+
+def run_winmerge(file1, file2):
+    """Lance WinMerge en ligne de commande"""
+    subprocess.run([WINMERGE_EXE, file1, file2])
+
+# === TNR ===
+with open(REPORT_FILE, 'w') as report:
+
+    # --- Index tous les fichiers ---
+    files1 = set(list_all_files(DIR1))
+    files2 = set(list_all_files(DIR2))
+    all_files = sorted(files1 | files2)
 
 
+    #  ----  Rapport  ----
+    report.write("=== TEST DE NON-RÉGRESSION TECHNIQUE ===\n")
+    report.write(
+        "Ce rapport vérifie uniquement :\n"
+        "- L'existence des fichiers dans les deux versions\n"
+        "- Les tailles\n"
+        "- Le contenu texte trié ligne par ligne\n"
+        "\n"
+        "Ce test est purement TECHNIQUE.\n"
+        "Il ne remplace pas une validation fonctionnelle ou métier.\n"
+        "Une vérification manuelle reste indispensable.\n\n"
+    )
 
-Dans le cadre de sa mise en conformité avec les obligations de production électronique des déclarations fiscales, LOLO souhaite automatiser la génération et la transmission du fichier SAF-T (Standard Audit File for Tax).
 
-Pour ce projet, LOLO s’appuie sur notre expertise reconnue en consulting data pour concevoir et déployer une solution simple, fiable et évolutive, capable de traiter et structurer les données comptables issues de l’ERP RentalMan.
+    # --- Bilan statistique ---
+    report.write("=== BILAN STATISTIQUE ===\n")
+    for rel_path in all_files:
+        f1 = os.path.join(DIR1, rel_path)
+        f2 = os.path.join(DIR2, rel_path)
+        exists1 = os.path.exists(f1)
+        exists2 = os.path.exists(f2)
+        size1 = get_file_size(f1)
+        size2 = get_file_size(f2)
+        report.write(f"{rel_path} | Exists V1: {exists1} | Exists V2: {exists2} | Size V1: {size1} | Size V2: {size2}\n")
+    report.write("\n")
 
-Notre rôle : mobiliser notre savoir-faire en data engineering, data quality et automatisation des flux pour répondre aux exigences strictes de l’administration fiscale norvégienne (NORVEG).
+    # --- Comparaison générique (Méthode 2) ---
+    report.write("=== BILAN DETAILLE METHODE 2 ===\n")
+    for rel_path in all_files:
+        ext = os.path.splitext(rel_path)[1].lower()
+        if not any(rel_path.endswith(ext) for ext in EXTENSIONS):
+            continue
+
+        f1 = os.path.join(DIR1, rel_path)
+        f2 = os.path.join(DIR2, rel_path)
+
+        if os.path.exists(f1) and os.path.exists(f2):
+            sorted1 = os.path.join(SORTED_DIR, rel_path.replace(os.sep, "_") + "_v1_sorted.txt")
+            sorted2 = os.path.join(SORTED_DIR, rel_path.replace(os.sep, "_") + "_v2_sorted.txt")
+            os.makedirs(os.path.dirname(sorted1), exist_ok=True)
+
+            sort_file(f1, sorted1)
+            sort_file(f2, sorted2)
+
+            # Tu peux commenter pour exécuter WinMerge manuellement ou auto :
+            report.write(f"Comparaison générique de : {rel_path}\n")
+            run_winmerge(sorted1, sorted2)
+            report.write(f" => WinMerge called on sorted files.\n")
+    report.write("\n")
+
+    # --- Comparaison XML spécifique (Méthode 1) ---
+    # report.write("=== BILAN DETAILLE XML METHODE 1 ===\n")
+    # xml_files = [f for f in all_files if f.endswith(".xml")]
+    # for rel_path in xml_files:
+    #     f1 = os.path.join(DIR1, rel_path)
+    #     f2 = os.path.join(DIR2, rel_path)
+
+    #     if os.path.exists(f1) and os.path.exists(f2):
+    #         report.write(f"Comparaison XML : {rel_path}\n")
+    #         try:
+    #             diff = xmldiff_main.diff_files(f1, f2, diff_options={'F': 1, 'ratio_mode': 'accurate'})
+    #             if diff:
+    #                 for d in diff:
+    #                     report.write(f"  • {d}\n")
+    #             else:
+    #                 report.write("  Aucun changement détecté.\n")
+    #         except Exception as e:
+    #             report.write(f"  Erreur XML diff: {e}\n")
+
+print(f"\n✅ TNR terminé. Voir {REPORT_FILE}")
