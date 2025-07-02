@@ -1,27 +1,24 @@
 import os
 import subprocess
 import argparse
-
+import difflib
 
 # ========================
 # === MESSAGE EXPLICATIF ===
 # ========================
 
 print("\n=== TEST DE NON-REGRESSION TECHNIQUE ===")
-print("[INFO] Ce test compare deux versions de fichiers (.xml, .csv, .log)")
-print("[INFO] Vérifie existence, taille et contenu trié ligne par ligne (Méthode 2)")
-print("[ATTENTION] Ce test est uniquement TECHNIQUE.")
-print("[ATTENTION] Il ne remplace PAS une validation FONCTIONNELLE ou METIER.")
-print("[ATTENTION] Une vérification manuelle reste indispensable.\n")
-
+print("[INFO] Compare deux versions de fichiers (.xml, .csv, .log)")
+print("[INFO] Vérifie existence, taille, contenu trié ligne par ligne (Méthode 2)")
+print("[ATTENTION] Contrôle TECHNIQUE uniquement — PAS de validation fonctionnelle ou métier !\n")
 
 # ========================
-# === PARAMETRES CLI ===
+# === ARGPARSE ===
 # ========================
 
 parser = argparse.ArgumentParser(description="Test de Non-Regression Technique (Méthode 2)")
-parser.add_argument("--version1", required=True, help="Chemin du dossier de la version 1")
-parser.add_argument("--version2", required=True, help="Chemin du dossier de la version 2")
+parser.add_argument("--version1", required=True, help="Chemin dossier version 1")
+parser.add_argument("--version2", required=True, help="Chemin dossier version 2")
 
 args = parser.parse_args()
 
@@ -45,7 +42,6 @@ EXTENSIONS = [".xml", ".csv", ".log"]
 
 if not os.path.exists(WINMERGE_EXE):
     raise FileNotFoundError(f"[ERREUR] WinMergeU.exe introuvable : {WINMERGE_EXE}")
-
 
 # ========================
 # === UTILS ===
@@ -72,7 +68,7 @@ def sort_file(input_file, output_file):
             f.write(line)
 
 def run_winmerge(file1, file2):
-    """Lance WinMerge et capture stdout/stderr"""
+    """Lance WinMerge"""
     try:
         result = subprocess.run(
             [WINMERGE_EXE, file1, file2],
@@ -82,7 +78,28 @@ def run_winmerge(file1, file2):
         )
         return result.returncode, result.stdout, result.stderr
     except Exception as e:
-        return -1, "", f"Exception lors de WinMerge: {e}"
+        return -1, "", f"Exception WinMerge : {e}"
+
+def run_fc(file1, file2):
+    """Utilise fc.exe pour un diff ligne par ligne"""
+    try:
+        result = subprocess.run(
+            ["fc", file1, file2],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        return result.returncode, result.stdout, result.stderr
+    except Exception as e:
+        return -1, "", f"Exception fc : {e}"
+
+def run_python_diff(file1, file2):
+    """Fallback Python difflib si fc indispo"""
+    with open(file1, encoding='utf-8') as f1, open(file2, encoding='utf-8') as f2:
+        lines1 = f1.readlines()
+        lines2 = f2.readlines()
+    diff = difflib.unified_diff(lines1, lines2, fromfile='v1', tofile='v2')
+    return ''.join(diff)
 
 
 # ========================
@@ -91,22 +108,21 @@ def run_winmerge(file1, file2):
 
 with open(REPORT_FILE, 'w', encoding='utf-8') as report:
 
-    # --- EN-TETE ---
+    # === EN-TETE ===
     report.write("=== TEST DE NON-REGRESSION TECHNIQUE ===\n")
     report.write(
-        "Ce rapport vérifie uniquement :\n"
-        "- L'existence des fichiers dans les deux versions\n"
-        "- Les tailles\n"
-        "- Le contenu texte trié ligne par ligne (Méthode 2)\n"
+        "Ce rapport vérifie :\n"
+        "- Existence des fichiers dans les deux versions\n"
+        "- Tailles comparées\n"
+        "- Contenu texte trié ligne par ligne\n"
+        "- Diff brut par fc ou Python diff\n"
         "\n"
-        "ATTENTION : Test purement TECHNIQUE.\n"
-        "Il ne remplace pas une validation fonctionnelle ou métier.\n"
-        "Une vérification manuelle reste indispensable.\n\n"
+        "ATTENTION : Test purement TECHNIQUE — PAS de validation fonctionnelle ou métier.\n\n"
     )
     report.write(f"Version 1 : {DIR1}\n")
     report.write(f"Version 2 : {DIR2}\n\n")
 
-    # --- Liste fichiers ---
+    # === Liste fichiers ===
     files1 = set(list_all_files(DIR1))
     files2 = set(list_all_files(DIR2))
     all_files = sorted(files1 | files2)
@@ -122,7 +138,7 @@ with open(REPORT_FILE, 'w', encoding='utf-8') as report:
         report.write(f"{rel_path} | Exists V1: {exists1} | Exists V2: {exists2} | Size V1: {size1} | Size V2: {size2}\n")
     report.write("\n")
 
-    report.write("=== BILAN DETAILLE METHODE 2 (TRI + WINMERGE) ===\n")
+    report.write("=== DETAILS COMPARAISONS METHODE 2 ===\n")
     for rel_path in all_files:
         ext = os.path.splitext(rel_path)[1].lower()
         if not any(rel_path.endswith(ext) for ext in EXTENSIONS):
@@ -139,12 +155,25 @@ with open(REPORT_FILE, 'w', encoding='utf-8') as report:
             sort_file(f1, sorted1)
             sort_file(f2, sorted2)
 
-            report.write(f"\nComparaison : {rel_path}\n")
-            code, stdout, stderr = run_winmerge(sorted1, sorted2)
-            report.write(f"Return code : {code}\n")
-            if stdout:
-                report.write(f"STDOUT :\n{stdout}\n")
-            if stderr:
-                report.write(f"STDERR :\n{stderr}\n")
+            report.write(f"\n--- Comparaison : {rel_path} ---\n")
 
-print(f"\n✅ TNR terminé. Rapport disponible : {REPORT_FILE}")
+            # WinMerge visuel
+            code, stdout, stderr = run_winmerge(sorted1, sorted2)
+            report.write(f"WinMerge Return code : {code}\n")
+            if stderr:
+                report.write(f"WinMerge STDERR : {stderr}\n")
+
+            # Diff ligne par ligne (fc ou fallback)
+            fc_code, fc_out, fc_err = run_fc(sorted1, sorted2)
+            if fc_code >= 0:
+                report.write(f"[fc] Return code : {fc_code}\n")
+                if fc_out:
+                    report.write(f"[fc] Diff output :\n{fc_out}\n")
+                if fc_err:
+                    report.write(f"[fc] Diff errors :\n{fc_err}\n")
+            else:
+                # Fallback difflib
+                py_diff = run_python_diff(sorted1, sorted2)
+                report.write(f"[PY-DIFF] Fallback Diff :\n{py_diff}\n")
+
+print(f"\n✅ TNR terminé. Rapport : {REPORT_FILE}")
