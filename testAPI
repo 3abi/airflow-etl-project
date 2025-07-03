@@ -1,179 +1,88 @@
-import os
-import subprocess
-import argparse
-import difflib
+# ✅ Test de Non-Régression Technique — `toto`
 
-# ========================
-# === MESSAGE EXPLICATIF ===
-# ========================
+Ce projet exécute un **test de non-régression technique** (*TNR*) pour comparer deux versions de livrables techniques — typiquement des fichiers **XML**, **CSV**, **LOG** — de façon simple et traçable.
 
-print("\n=== TEST DE NON-REGRESSION TECHNIQUE ===")
-print("[INFO] Compare deux versions de fichiers (.xml, .csv, .log)")
-print("[INFO] Vérifie existence, taille, contenu trié ligne par ligne (Méthode 2)")
-print("[ATTENTION] Contrôle TECHNIQUE uniquement — PAS de validation fonctionnelle ou métier !\n")
+---
 
-# ========================
-# === ARGPARSE ===
-# ========================
+## 🎯 **Objectif**
 
-parser = argparse.ArgumentParser(description="Test de Non-Regression Technique (Méthode 2)")
-parser.add_argument("--version1", required=True, help="Chemin dossier version 1")
-parser.add_argument("--version2", required=True, help="Chemin dossier version 2")
+- Vérifier automatiquement :
+  - L’existence des fichiers dans les deux versions
+  - La cohérence des tailles de fichiers
+  - Le contenu **texte trié** ligne par ligne (pour neutraliser l’ordre)
+- Fournir :
+  - Un **rapport `.txt`** détaillé et structuré
+  - Des comparaisons visuelles **WinMerge**
+  - Un diff **texte brut** via `fc` (ou `difflib` Python en secours)
 
-args = parser.parse_args()
+---
 
-# === ROOT + STRUCTURE ===
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-print(f"[INFO] ROOT_DIR : {ROOT_DIR}")
-
-DIR1 = os.path.abspath(args.version1)
-DIR2 = os.path.abspath(args.version2)
-
-OUTPUT_DIR = os.path.join(ROOT_DIR, "TNR_RESULTS")
-SORTED_DIR = os.path.join(OUTPUT_DIR, "SORTED_FILES")
-TNR_TOOLKIT = os.path.join(ROOT_DIR, "utils")
-WINMERGE_EXE = os.path.join(TNR_TOOLKIT, "WinMergeU.exe")
-REPORT_FILE = os.path.join(OUTPUT_DIR, "report_global.txt")
-
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(SORTED_DIR, exist_ok=True)
-
-EXTENSIONS = [".xml", ".csv", ".log"]
-
-if not os.path.exists(WINMERGE_EXE):
-    raise FileNotFoundError(f"[ERREUR] WinMergeU.exe introuvable : {WINMERGE_EXE}")
-
-# ========================
-# === UTILS ===
-# ========================
-
-def list_all_files(base_dir):
-    file_paths = []
-    for root, _, files in os.walk(base_dir):
-        for f in files:
-            f_clean = f.lower()
-            if any(f_clean.endswith(ext) for ext in EXTENSIONS):
-                relative_path = os.path.relpath(os.path.join(root, f), base_dir)
-                file_paths.append(relative_path)
-    return sorted(file_paths)
-
-def get_file_size(path):
-    return os.path.getsize(path) if os.path.exists(path) else 0
-
-def sort_file(input_file, output_file):
-    with open(input_file, 'r', encoding='utf-8', errors='ignore') as f:
-        lines = f.readlines()
-    with open(output_file, 'w', encoding='utf-8') as f:
-        for line in sorted(lines):
-            f.write(line)
-
-def run_winmerge(file1, file2):
-    """Lance WinMerge"""
-    try:
-        result = subprocess.run(
-            [WINMERGE_EXE, file1, file2],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        return result.returncode, result.stdout, result.stderr
-    except Exception as e:
-        return -1, "", f"Exception WinMerge : {e}"
-
-def run_fc(file1, file2):
-    """Utilise fc.exe pour un diff ligne par ligne"""
-    try:
-        result = subprocess.run(
-            ["fc", file1, file2],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        return result.returncode, result.stdout, result.stderr
-    except Exception as e:
-        return -1, "", f"Exception fc : {e}"
-
-def run_python_diff(file1, file2):
-    """Fallback Python difflib si fc indispo"""
-    with open(file1, encoding='utf-8') as f1, open(file2, encoding='utf-8') as f2:
-        lines1 = f1.readlines()
-        lines2 = f2.readlines()
-    diff = difflib.unified_diff(lines1, lines2, fromfile='v1', tofile='v2')
-    return ''.join(diff)
+## 📂 **Structure recommandée**
 
 
-# ========================
-# === TNR ===
-# ========================
+projet/
+├── scripts/
+│ └── toto.py # Ton script principal
+├── utils/
+│ └── WinMergeU.exe # Version portable de WinMerge
+├── INPUT/
+│ ├── Resultats_95_V1/ # Exemple Version 1
+│ └── Resultats_95_V2/ # Exemple Version 2
+├── TNR_RESULTS/ # Rapport généré + fichiers triés
+└── README.md # Ce fichier
 
-with open(REPORT_FILE, 'w', encoding='utf-8') as report:
 
-    # === EN-TETE ===
-    report.write("=== TEST DE NON-REGRESSION TECHNIQUE ===\n")
-    report.write(
-        "Ce rapport vérifie :\n"
-        "- Existence des fichiers dans les deux versions\n"
-        "- Tailles comparées\n"
-        "- Contenu texte trié ligne par ligne\n"
-        "- Diff brut par fc ou Python diff\n"
-        "\n"
-        "ATTENTION : Test purement TECHNIQUE — PAS de validation fonctionnelle ou métier.\n\n"
-    )
-    report.write(f"Version 1 : {DIR1}\n")
-    report.write(f"Version 2 : {DIR2}\n\n")
+---
 
-    # === Liste fichiers ===
-    files1 = set(list_all_files(DIR1))
-    files2 = set(list_all_files(DIR2))
-    all_files = sorted(files1 | files2)
+## ⚙️ **Prérequis**
 
-    report.write("=== BILAN STATISTIQUE ===\n")
-    for rel_path in all_files:
-        f1 = os.path.join(DIR1, rel_path)
-        f2 = os.path.join(DIR2, rel_path)
-        exists1 = os.path.exists(f1)
-        exists2 = os.path.exists(f2)
-        size1 = get_file_size(f1)
-        size2 = get_file_size(f2)
-        report.write(f"{rel_path} | Exists V1: {exists1} | Exists V2: {exists2} | Size V1: {size1} | Size V2: {size2}\n")
-    report.write("\n")
+- Python 3.x installé.
+- `WinMergeU.exe` (version portable) placé dans `utils/`.
+- Pour `fc` :
+  - Disponible nativement sous **Windows** (`fc.exe`).
+- Pas besoin d’autre module externe (tout est Python standard).
 
-    report.write("=== DETAILS COMPARAISONS METHODE 2 ===\n")
-    for rel_path in all_files:
-        ext = os.path.splitext(rel_path)[1].lower()
-        if not any(rel_path.endswith(ext) for ext in EXTENSIONS):
-            continue
+---
 
-        f1 = os.path.join(DIR1, rel_path)
-        f2 = os.path.join(DIR2, rel_path)
+## ✅ **Fonctionnement**
 
-        if os.path.exists(f1) and os.path.exists(f2):
-            sorted1 = os.path.join(SORTED_DIR, rel_path.replace(os.sep, "_") + "_v1_sorted.txt")
-            sorted2 = os.path.join(SORTED_DIR, rel_path.replace(os.sep, "_") + "_v2_sorted.txt")
-            os.makedirs(os.path.dirname(sorted1), exist_ok=True)
+1️⃣ Le script trie chaque fichier cible ligne par ligne pour neutraliser l’ordre (utile pour CSV/LOG/XML si l’ordre n’est pas significatif).  
+2️⃣ Il compare chaque paire (`v1` ↔ `v2`) :
+   - **Visuellement** avec **WinMerge** (ouvre la fenêtre GUI).
+   - **Automatiquement** en ligne de commande avec `fc` :
+     - Diff brute intégrée dans le rapport `.txt`.
+     - Si `fc` n’est pas dispo, `difflib` Python prend le relais.
+3️⃣ Il génère :
+   - Un rapport texte `TNR_RESULTS/report_global.txt` détaillant tout.
+   - Des copies triées dans `TNR_RESULTS/SORTED_FILES`.
 
-            sort_file(f1, sorted1)
-            sort_file(f2, sorted2)
+---
 
-            report.write(f"\n--- Comparaison : {rel_path} ---\n")
+## 🗂️ **Extensions traitées**
 
-            # WinMerge visuel
-            code, stdout, stderr = run_winmerge(sorted1, sorted2)
-            report.write(f"WinMerge Return code : {code}\n")
-            if stderr:
-                report.write(f"WinMerge STDERR : {stderr}\n")
+Par défaut :
 
-            # Diff ligne par ligne (fc ou fallback)
-            fc_code, fc_out, fc_err = run_fc(sorted1, sorted2)
-            if fc_code >= 0:
-                report.write(f"[fc] Return code : {fc_code}\n")
-                if fc_out:
-                    report.write(f"[fc] Diff output :\n{fc_out}\n")
-                if fc_err:
-                    report.write(f"[fc] Diff errors :\n{fc_err}\n")
-            else:
-                # Fallback difflib
-                py_diff = run_python_diff(sorted1, sorted2)
-                report.write(f"[PY-DIFF] Fallback Diff :\n{py_diff}\n")
+.xml, .csv, .log
 
-print(f"\n✅ TNR terminé. Rapport : {REPORT_FILE}")
+
+Ces extensions sont comparées **sans sensibilité à la casse**.
+
+---
+
+## 🚀 **Lancer le test**
+
+Dans ton terminal (PowerShell ou `cmd.exe`) :
+
+```bash
+python scripts/toto.py --version1 "INPUT/Resultats_95_V1" --version2 "INPUT/Resultats_95_V2"
+
+
+
+Crée un run_tnr.bat :
+
+@echo off
+echo Lancement du TNR...
+python scripts\toto.py --version1 "INPUT/Resultats_95_V1" --version2 "INPUT/Resultats_95_V2"
+pause
+
+
