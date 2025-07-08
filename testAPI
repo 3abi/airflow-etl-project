@@ -88,4 +88,29 @@ pause
 
 
 
+Objet : Données manquantes – Vérification TNR et prochaines étapes
+
+Bonjour,
+
+Suite à votre retour concernant les lignes manquantes, nous avons mené plusieurs vérifications pour comprendre l’origine de ces écarts.
+
+Dans un premier temps, nous avons tenté de reproduire ces écarts sur les sections concernées. Nous avons réalisé le test TNR de notre côté : celui-ci s’est avéré conforme et n’a mis en évidence aucune anomalie technique lors de l’exécution des traitements.
+
+Nous avons ensuite vérifié le contenu des fichiers XML générés pour les versions V1 et V2 : les lignes signalées comme manquantes n’y figurent pas, et il n’y a aucun écart entre les fichiers produits pour V1 et V2.
+
+Enfin, nous avons contrôlé les fichiers d’entrée disponibles dans le dossier « INPUT/ » : les données manquantes ne s’y trouvent pas non plus. Cela confirme que ces informations n’ont pas pu être intégrées lors du traitement, faute de disponibilité dans les données d’entrée.
+
+Nous en concluons donc que nous ne disposons probablement pas de la dernière mise à jour des données pour le lot 34.
+
+Prochaine étape :
+Afin de poursuivre notre analyse et résoudre ces écarts, nous vous proposons de nous transmettre la version la plus récente des données d’entrée pour le lot 34. Dès réception, nous relancerons les traitements et reviendrons vers vous avec les résultats mis à jour.
+
+Nous restons à votre disposition pour toute précision complémentaire.
+
+Bien cordialement,
+[Votre Nom]
+[Votre Société]
+
+
+
 
