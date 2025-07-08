@@ -86,3 +86,12 @@ python scripts\toto.py --version1 "INPUT/Resultats_95_V1" --version2 "INPUT/Resu
 pause
 
 
+
+
+
+Je fais suite au mail de DDD (ci-dessous). J’ai essayé de reproduire ces écarts de notre côté pour les sections impactées, et après vérification des fichiers XML j’ai trouvé que ces données sont manquantes dans les deux versions V1 et V2. J’ai vérifié aussi les données d’entrées dans « INPUT/ », ces données n’existent pas dans les fichiers d’entrées. Je trouve que c’est la raison pour laquelle ces données ne sont pas présentes dans les résultats de V1 et V2.
+
+Je suppose qu’on n’a pas le dernier update de données d’entrées pour 34.
+
+ Actions :
+Récupération de nouvelles données 34 pour reproduire ces écarts de notre côté.
