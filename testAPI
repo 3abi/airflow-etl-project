@@ -89,37 +89,3 @@ pause
 
 
 
-Objet : Données manquantes – Vérification et actions à venir
-
-Bonjour,
-
-Je fais suite au mail de DDD (ci-dessous). J’ai essayé de reproduire ces écarts de notre côté pour les sections concernées. Après vérification des fichiers XML, j’ai constaté que ces données sont absentes dans les deux versions V1 et V2. J’ai également vérifié les données d’entrée dans le dossier « INPUT/ » : ces informations n’y figurent pas non plus. C’est, selon moi, la raison pour laquelle elles n’apparaissent pas dans les résultats des versions V1 et V2.
-
-J’en conclus que nous ne disposons probablement pas de la dernière mise à jour des données d’entrée pour le lot 34.
-
-Actions :
-
-Récupérer les nouvelles données du lot 34 afin de pouvoir reproduire ces écarts de notre côté.
-
-Bien cordialement,
-[Votre Nom]
-
-
-
-
-Bonjour,
-
-Suite à votre retour concernant les lignes manquantes, nous avons mené plusieurs vérifications pour comprendre l’origine de ces écarts.
-
-Dans un premier temps, nous avons tenté de reproduire ces écarts de notre côté sur les sections concernées. Nous avons ensuite vérifié le contenu des fichiers XML générés pour les versions V1 et V2 : nous avons constaté que les données signalées comme manquantes n’y figurent pas et qu’il n’y a pas d’écart entre les fichiers produits pour V1 et V2.
-
-Nous avons également contrôlé les fichiers d’entrée disponibles dans le dossier « INPUT/ » : là encore, les informations manquantes ne sont pas présentes. Cela confirme que ces données n’ont pas été intégrées lors du traitement, faute de disponibilité en entrée.
-
-Nous en concluons donc que nous ne disposons probablement pas de la dernière mise à jour des données d’entrée pour le lot 34.
-
-Prochaine étape :
-Afin de pouvoir poursuivre notre analyse et résoudre ces écarts, nous vous proposons de nous transmettre la version la plus récente des données du lot 34. Dès réception, nous relancerons les traitements et reviendrons vers vous avec les résultats mis à jour.
-
-Nous restons à votre disposition pour toute précision complémentaire.
-
-Bien cordialement,
