@@ -89,9 +89,17 @@ pause
 
 
 
-Je fais suite au mail de DDD (ci-dessous). J’ai essayé de reproduire ces écarts de notre côté pour les sections impactées, et après vérification des fichiers XML j’ai trouvé que ces données sont manquantes dans les deux versions V1 et V2. J’ai vérifié aussi les données d’entrées dans « INPUT/ », ces données n’existent pas dans les fichiers d’entrées. Je trouve que c’est la raison pour laquelle ces données ne sont pas présentes dans les résultats de V1 et V2.
+Objet : Données manquantes – Vérification et actions à venir
 
-Je suppose qu’on n’a pas le dernier update de données d’entrées pour 34.
+Bonjour,
 
- Actions :
-Récupération de nouvelles données 34 pour reproduire ces écarts de notre côté.
+Je fais suite au mail de DDD (ci-dessous). J’ai essayé de reproduire ces écarts de notre côté pour les sections concernées. Après vérification des fichiers XML, j’ai constaté que ces données sont absentes dans les deux versions V1 et V2. J’ai également vérifié les données d’entrée dans le dossier « INPUT/ » : ces informations n’y figurent pas non plus. C’est, selon moi, la raison pour laquelle elles n’apparaissent pas dans les résultats des versions V1 et V2.
+
+J’en conclus que nous ne disposons probablement pas de la dernière mise à jour des données d’entrée pour le lot 34.
+
+Actions :
+
+Récupérer les nouvelles données du lot 34 afin de pouvoir reproduire ces écarts de notre côté.
+
+Bien cordialement,
+[Votre Nom]
