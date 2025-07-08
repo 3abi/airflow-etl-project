@@ -10,7 +10,7 @@ Ce projet exécute un **test de non-régression technique** (*TNR*) pour compare
   - L’existence des fichiers dans les deux versions
   - La cohérence des tailles de fichiers
   - Le contenu **texte trié** ligne par ligne (pour neutraliser l’ordre)
-- Fournir :
+- Fournir :  
   - Un **rapport `.txt`** détaillé et structuré
   - Des comparaisons visuelles **WinMerge**
   - Un diff **texte brut** via `fc` (ou `difflib` Python en secours)
@@ -103,3 +103,23 @@ Récupérer les nouvelles données du lot 34 afin de pouvoir reproduire ces éca
 
 Bien cordialement,
 [Votre Nom]
+
+
+
+
+Bonjour,
+
+Suite à votre retour concernant les lignes manquantes, nous avons mené plusieurs vérifications pour comprendre l’origine de ces écarts.
+
+Dans un premier temps, nous avons tenté de reproduire ces écarts de notre côté sur les sections concernées. Nous avons ensuite vérifié le contenu des fichiers XML générés pour les versions V1 et V2 : nous avons constaté que les données signalées comme manquantes n’y figurent pas et qu’il n’y a pas d’écart entre les fichiers produits pour V1 et V2.
+
+Nous avons également contrôlé les fichiers d’entrée disponibles dans le dossier « INPUT/ » : là encore, les informations manquantes ne sont pas présentes. Cela confirme que ces données n’ont pas été intégrées lors du traitement, faute de disponibilité en entrée.
+
+Nous en concluons donc que nous ne disposons probablement pas de la dernière mise à jour des données d’entrée pour le lot 34.
+
+Prochaine étape :
+Afin de pouvoir poursuivre notre analyse et résoudre ces écarts, nous vous proposons de nous transmettre la version la plus récente des données du lot 34. Dès réception, nous relancerons les traitements et reviendrons vers vous avec les résultats mis à jour.
+
+Nous restons à votre disposition pour toute précision complémentaire.
+
+Bien cordialement,
