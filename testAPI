@@ -113,4 +113,18 @@ Bien cordialement,
 
 
 
+Inspiré des problématiques de data engineering liées au développement de stratégies d’interopérabilité entre des socles Data de technologies hétérogènes, le projet XXXX vise à faciliter l’exploration combinatoire en temps réel des données stockées dans des systèmes différents de gestion de bases de données, en s’appuyant sur l’ingénierie orientée LLM grâce à un orchestrateur de prompt spécialisé. Plus précisément, le projet XXX entend fournir un dispositif conversationnel spécialisé sur l’extraction duale d’enregistrements (ou données) de bases données de technologies hétérogènes sous licence libre et basé sur des modèles LLM de fondation ouverts. Il fournit des services et outils : 
+
+Sachant se connecter, détecter la nature technologique d’un SGBD et comprendre la structure de son modèle physique d’hébergement des données  
+
+Sachant aligner sémantiquement un prompt spécialisé en langage naturel et les métadonnées et champs de la structure du modèle physique du SGBD 
+
+Capable de générer la requête technique de données non seulement compatible du sens déduit du prompt spécialisé, mais aussi du formalisme de langage de requête sous-jacent à la technologie du SGBD 
+
+Exposant une interface de restitution des données  
+
+
+
+
+
 
