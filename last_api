@@ -1,165 +1,19 @@
-
-import pandas as pd
-import datetime
-
-# Noms des fichiers source
-input1_file = './WORKSPACE/JOIN/input1_file.CSV'
-input2_file = './WORKSPACE/JOIN/input2_file.CSV' 
-input3_file = './WORKSPACE/JOIN/input3_file.CSV'
-input4_file = './WORKSPACE/JOIN/input4_file.CSV'
-input5_file = './WORKSPACE/JOIN/input5_file.CSV'  
-
-# Nom du fichier résultat
-output_file = './WORKSPACE/TRANSFO/output_file.CSV'
-
-def traiter_invoices():
-    # Lire les fichiers d'entrée dans des DataFrames pandas
-    df_input1 = pd.read_csv(input1_file, delimiter=';', encoding='utf-8', dtype=str)
-    df_input2 = pd.read_csv(input2_file, delimiter=';', encoding='utf-8', dtype=str)
-    df_input3 = pd.read_csv(input3_file, delimiter=';', encoding='utf-8', dtype=str)
-    df_input4 = pd.read_csv(input4_file, delimiter=';', encoding='utf-8', dtype=str)
-    df_input5 = pd.read_csv(input5_file, delimiter=';', encoding='utf-8', dtype=str)  # Lecture de input5
-
-    # Afficher le nombre de lignes de chaque fichier d'entrée
-    print(f"    Nombre de lignes dans input1 ({input1_file}): {len(df_input1)}")
-    print(f"    Nombre de lignes dans input2 ({input2_file}): {len(df_input2)}")
-    print(f"    Nombre de lignes dans input3 ({input3_file}): {len(df_input3)}")
-    print(f"    Nombre de lignes dans input4 ({input4_file}): {len(df_input4)}")
-    print(f"    Nombre de lignes dans input5 ({input5_file}): {len(df_input5)}")  # Affichage pour input5
-
-    # Filtrer les fichiers input3 et input4
-    #df_input3 = df_input3[df_input3['RDTYPE'].isin(['RI', 'ES'])]
-    #df_input4 = df_input4[~df_input4['RDTYPE'].isin(['RI', 'ES'])]
-    
-    df_input3 = df_input3[df_input3['RDTYPE'].isin(['ES', 'RI']) | ((df_input3['RDTYPE'] == 'SI') & (df_input3['RDCATG'] != 0))]
-    df_input4 = df_input4[(~df_input4['RDTYPE'].isin(['ES', 'RI'])) | ((df_input4['RDTYPE'] == 'SI') & (df_input4['RDCATG'] != 0))]
-
-    # Ajouter une colonne 'Source' pour identifier l'origine des enregistrements
-    df_input1['Source'] = 'input1'
-    df_input2['Source'] = 'input2'
-    df_input3['Source'] = 'input3'
-    df_input4['Source'] = 'input4'
-    df_input5['Source'] = 'input5'  # Ajout de la colonne Source pour input5
-
-    # Gestion des colonnes 'RHTYPE' et 'GJAMT$' dans df_input1
-    if 'RHTYPE' not in df_input1.columns:
-        df_input1['RHTYPE'] = ''
-    if 'GJAMT$' not in df_input1.columns:
-        df_input1['GJAMT$'] = '0'
-    df_input1['GJAMT$_float'] = pd.to_numeric(df_input1['GJAMT$'], errors='coerce').fillna(0.0) #AHAMT$
-
-    # Assurer que 'RHTYPE' n'a pas de valeurs manquantes ou d'espaces superflus
-    df_input1['RHTYPE'] = df_input1['RHTYPE'].fillna('ERREUR_TYPE').str.strip()
-
-    # Jointure des DataFrames selon les clés spécifiées
-    df_merged_input2 = df_input1.merge(
-        df_input2, left_on='GJINV#', right_on='KEY1_x', how='inner', suffixes=('', '_input2') 
-    )
-    df_merged_input3 = df_input1.merge(
-        df_input3, left_on='GJINV#', right_on='KEY1', how='inner', suffixes=('', '_input3')
-    )
-    df_merged_input4 = df_input1.merge(
-        df_input4, left_on='GJINV#', right_on='KEY1_x', how='inner', suffixes=('', '_input4')
-    )
-    df_merged_input5 = df_input1.merge(
-        df_input5, left_on='GJINV#', right_on='KEY1_x', how='inner', suffixes=('', '_input5')
-    )
-
-    # Fusionner les DataFrames pour inclure toutes les lignes
-    df_merged_ok = pd.concat([df_merged_input2, df_merged_input3, df_merged_input4, df_merged_input5], ignore_index=True)
-
-    # Effectuer une jointure externe pour inclure toutes les lignes de df_input1 qui ne sont pas dans df_merged_ok
-    df_merged = df_input1.merge(
-        df_merged_ok, on='GJINV#', how='left', suffixes=('', '_noinput')
-    )
-
-    # Déterminer la 'Source' finale en fonction des fusions réussies
-    df_merged['Source'] = 'ERREUR_Source'
-    df_merged.loc[df_merged['Source_input2'].notnull(), 'Source'] = 'input2'
-    df_merged.loc[df_merged['Source_input3'].notnull(), 'Source'] = 'input3'
-    df_merged.loc[df_merged['Source_input4'].notnull(), 'Source'] = 'input4'
-    df_merged.loc[df_merged['Source_input5'].notnull(), 'Source'] = 'input5'
-
-    # Appliquer la nouvelle règle pour 'InvoiceType'
-    df_merged['InvoiceType'] = df_merged.apply(
-        lambda row: row['RHTYPE'] if row['RHTYPE'] != 'ERREUR_TYPE' else ('O' if row['GJAMT$_float'] > 0 else 'C'),
-        axis=1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
-    )
-
-    # Déterminer 'LineNumber' en fonction de la source
-    df_merged['LineNumber'] = '0'
-    df_merged.loc[df_merged['Source'] == 'input3', 'LineNumber'] = df_merged['RDTYPE'].fillna('') + '_' + df_merged['RDSEQ#'].fillna('')
-    df_merged.loc[df_merged['Source'] == 'input4', 'LineNumber'] = df_merged['RDTYPE'].fillna('') + '_' + df_merged['RDSEQ#'].fillna('')
-    df_merged.loc[df_merged['Source'] == 'input5', 'LineNumber'] = df_merged['RDTYPE'].fillna('') + '_' + df_merged['RDSEQ#'].fillna('')
-    df_merged.loc[df_merged['Source'] == 'input2', 'LineNumber'] = df_merged['RSSEQ#'].fillna('')
-
-    # Déterminer 'Description' en fonction de la source
-    df_merged['Description'] = '0'
-    df_merged.loc[df_merged['Source'] == 'input2', 'Description'] = df_merged['IMDESC'].fillna('')
-    df_merged.loc[df_merged['Source'] == 'input4', 'Description'] = df_merged['IMDESC'].fillna('')
-    df_merged.loc[df_merged['Source'] == 'input5', 'Description'] = df_merged['IMDESC'].fillna('')
-    df_merged.loc[df_merged['Source'] == 'input3', 'Description'] = df_merged['ECDESC'].fillna('')
-
-    # Calculer 'ProductCode' en fonction de la source
-    df_merged['ProductCode'] = '0'
-    df_merged.loc[df_merged['Source'] == 'input3', 'ProductCode'] = df_merged['RDITEM'].fillna('')
-    df_merged.loc[df_merged['Source'] == 'input4', 'ProductCode'] = df_merged['RDSTKC'].fillna('') + '_' + df_merged['RDITEM'].fillna('')
-    df_merged.loc[df_merged['Source'] == 'input5', 'ProductCode'] = df_merged['RDSTKC'].fillna('') + '_' + df_merged['RDITEM'].fillna('')
-    df_merged.loc[df_merged['Source'] == 'input2', 'ProductCode'] = df_merged['RSSTKC'].fillna('') + '_' + df_merged['RSITEM'].fillna('')
-
-    # Calculer 'UnitPrice' en fonction de la source
-    df_merged['UnitPrice'] = df_merged['GJAMT$'].fillna('0.0')  # valeur par défaut
-    df_merged.loc[df_merged['Source'] == 'input3', 'UnitPrice'] = df_merged['RDAMT$'].fillna(df_merged['GJAMT$'])
-    df_merged.loc[df_merged['Source'] == 'input4', 'UnitPrice'] = df_merged['RDAMT$'].fillna(df_merged['GJAMT$'])
-    df_merged.loc[df_merged['Source'] == 'input5', 'UnitPrice'] = df_merged['RDAMT$'].fillna(df_merged['GJAMT$'])
-    df_merged.loc[df_merged['Source'] == 'input2', 'UnitPrice'] = df_merged['RSAMT$'].fillna(df_merged['GJAMT$'])
-
-    # Calculer 'DebitCreditIndicator' basé sur la valeur de 'UnitPrice'
-    df_merged['UnitPrice_float'] = pd.to_numeric(df_merged['UnitPrice'], errors='coerce').fillna(0.0)
-    df_merged['DebitCreditIndicator'] = df_merged['UnitPrice_float'].apply(lambda x: 'D' if x < 0 else 'C')
-    
-    # Renommer les colonnes
-    df_output = df_merged.rename(columns={
-        'GJINV#': 'InvoiceNo', 
-        'AHINVD': 'InvoiceDate', 
-        'RDTAXC': 'GoodsServiceID', 
-        # Autres renommages si nécessaire
-    })
-
-    # Créer 'GLPostingDate' en copiant 'GJDTJP' et utiliser 'InvoiceDate' comme valeur par défaut
-    df_output['GLPostingDate'] = df_merged['GJDTJP'].fillna(df_merged['AHINVD'])
-
-    # Créer 'GLPostingDate' en copiant 'GJDTJP' ou 'InvoiceDate' si 'GJDTJP' n'existe pas
-    # if 'GJDTJP' in df_merged.columns:
-    #     df_output['GLPostingDate'] = df_merged['GJDTJP']
-    # else:
-    #     df_output['GLPostingDate'] = df_output['InvoiceDate']
-
-    # Créer 'InvoiceLineAmount' en copiant 'UnitPrice'
-    df_output['InvoiceLineAmount'] = df_output['UnitPrice']
-
-    # Convertir les dates au format AAAA-MM-JJ
-    df_output['InvoiceDate'] = pd.to_datetime(df_output['InvoiceDate'], format='%Y%m%d', errors='coerce').dt.strftime('%Y-%m-%d')
-    df_output['GLPostingDate'] = pd.to_datetime(df_output['GLPostingDate'], format='%Y%m%d', errors='coerce').dt.strftime('%Y-%m-%d')
-
-    # Assurer que les colonnes nécessaires existent
-    necessary_columns = [
-        'InvoiceNo', 'InvoiceDate', 'InvoiceType', 'GLPostingDate', 'LineNumber', 'GoodsServiceID', 'ProductCode', 'UnitPrice', 'Description', 'InvoiceLineAmount', 'DebitCreditIndicator', 'Source'
-    ]
-
-    for col in necessary_columns:
-        if col not in df_output.columns:
-            df_output[col] = ''  # Créer la colonne avec des valeurs vides si elle n'existe pas
-
-    # Sélectionner les colonnes finales
-    df_output = df_output[necessary_columns]
-
-    # Écrire le résultat dans le fichier CSV
-    df_output.to_csv(output_file, sep=';', index=False, encoding='utf-8')
-
-    print(f"    Jointure et écriture terminées. Les résultats sont enregistrés dans {output_file}.")
-    print(f"    Nombre de lignes dans le fichier résultat : {len(df_output)}")
-    print(f"    Nombre de InvoiceNo uniques dans le fichier résultat : {df_output['InvoiceNo'].nunique()}")
-
-if __name__ == "__main__":
-    traiter_invoices()
+backend-1   | INFO:     172.24.0.1:58976 - "GET / HTTP/1.1" 200 OK
+backend-1   | INFO:     172.24.0.1:58976 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+backend-1   | INFO:     172.24.0.1:58990 - "POST /query HTTP/1.1" 405 Method Not Allowed
+backend-1   | INFO:     172.24.0.1:58990 - "POST /query HTTP/1.1" 405 Method Not Allowed
+backend-1   | INFO:     172.24.0.1:50870 - "GET / HTTP/1.1" 304 Not Modified
+backend-1   | INFO:     172.24.0.1:50870 - "GET / HTTP/1.1" 304 Not Modified
+backend-1   | INFO:     172.24.0.1:50870 - "GET / HTTP/1.1" 304 Not Modified
+backend-1   | INFO:     172.24.0.1:50862 - "POST /query HTTP/1.1" 405 Method Not Allowed
+ollama-1    | [GIN] 2025/07/15 - 14:30:19 | 200 |    1.237599ms |      172.24.0.1 | GET      "/"
+backend-1   | INFO:     172.24.0.1:38048 - "POST /query HTTP/1.1" 405 Method Not Allowed
+backend-1   | INFO:     172.24.0.1:38048 - "GET / HTTP/1.1" 304 Not Modified
+backend-1   | INFO:     172.24.0.1:38048 - "POST /query HTTP/1.1" 405 Method Not Allowed
+backend-1   | INFO:     172.24.0.1:60094 - "GET / HTTP/1.1" 304 Not Modified
+postgres-1  | 2025-07-15 14:31:45.252 UTC [64] LOG:  checkpoint starting: time
+postgres-1  | 2025-07-15 14:31:49.284 UTC [64] LOG:  checkpoint complete: wrote 43 buffers (0.3%); 0 WAL file(s) added, 0 removed, 0 recycled; write=4.018 s, sync=0.006 s, total=4.032 s; sync files=11, longest=0.003 s, average=0.001 s; distance=252 kB, estimate=252 kB
+backend-1   | INFO:     172.24.0.1:33162 - "GET / HTTP/1.1" 304 Not Modified
+backend-1   | INFO:     172.24.0.1:33162 - "POST /query HTTP/1.1" 405 Method Not Allowed
+backend-1   | INFO:     172.24.0.1:33162 - "GET / HTTP/1.1" 304 Not Modified
+ollama-1    | [GIN] 2025/07/15 - 14:32:18 | 200 |      39.843µs |      172.24.0.1 | GET      "/"
