@@ -1,19 +1,54 @@
-backend-1   | INFO:     172.24.0.1:58976 - "GET / HTTP/1.1" 200 OK
-backend-1   | INFO:     172.24.0.1:58976 - "GET /favicon.ico HTTP/1.1" 404 Not Found
-backend-1   | INFO:     172.24.0.1:58990 - "POST /query HTTP/1.1" 405 Method Not Allowed
-backend-1   | INFO:     172.24.0.1:58990 - "POST /query HTTP/1.1" 405 Method Not Allowed
-backend-1   | INFO:     172.24.0.1:50870 - "GET / HTTP/1.1" 304 Not Modified
-backend-1   | INFO:     172.24.0.1:50870 - "GET / HTTP/1.1" 304 Not Modified
-backend-1   | INFO:     172.24.0.1:50870 - "GET / HTTP/1.1" 304 Not Modified
-backend-1   | INFO:     172.24.0.1:50862 - "POST /query HTTP/1.1" 405 Method Not Allowed
-ollama-1    | [GIN] 2025/07/15 - 14:30:19 | 200 |    1.237599ms |      172.24.0.1 | GET      "/"
-backend-1   | INFO:     172.24.0.1:38048 - "POST /query HTTP/1.1" 405 Method Not Allowed
-backend-1   | INFO:     172.24.0.1:38048 - "GET / HTTP/1.1" 304 Not Modified
-backend-1   | INFO:     172.24.0.1:38048 - "POST /query HTTP/1.1" 405 Method Not Allowed
-backend-1   | INFO:     172.24.0.1:60094 - "GET / HTTP/1.1" 304 Not Modified
-postgres-1  | 2025-07-15 14:31:45.252 UTC [64] LOG:  checkpoint starting: time
-postgres-1  | 2025-07-15 14:31:49.284 UTC [64] LOG:  checkpoint complete: wrote 43 buffers (0.3%); 0 WAL file(s) added, 0 removed, 0 recycled; write=4.018 s, sync=0.006 s, total=4.032 s; sync files=11, longest=0.003 s, average=0.001 s; distance=252 kB, estimate=252 kB
-backend-1   | INFO:     172.24.0.1:33162 - "GET / HTTP/1.1" 304 Not Modified
-backend-1   | INFO:     172.24.0.1:33162 - "POST /query HTTP/1.1" 405 Method Not Allowed
-backend-1   | INFO:     172.24.0.1:33162 - "GET / HTTP/1.1" 304 Not Modified
-ollama-1    | [GIN] 2025/07/15 - 14:32:18 | 200 |      39.843µs |      172.24.0.1 | GET      "/"
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import json
+
+app = FastAPI()
+
+# CORS pour autoriser requêtes JS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # en prod : ["http://localhost:8000"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve le HTML en statique
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
+# Simule la logique IA + SQL (à remplacer par ton vrai code)
+@app.post("/query")
+async def handle_prompt(request: Request):
+    data = await request.json()
+    prompt = data.get("prompt", "").lower()
+
+    # Démo : réponse simulée
+    if "client" in prompt:
+        query = "SELECT * FROM clients ORDER BY date_inscription DESC LIMIT 5;"
+        results = [
+            {"id": 1, "nom": "Alice", "date_inscription": "2024-01-12"},
+            {"id": 2, "nom": "Bob", "date_inscription": "2024-03-22"},
+        ]
+    else:
+        query = "SELECT * FROM clients;"
+        results = []
+
+    return {"query": query, "results": results}
+
+
+
+<script>
+async function sendPrompt() {
+    const prompt = document.getElementById("prompt").value;
+    const res = await fetch("/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+}
+</script>
+
+
