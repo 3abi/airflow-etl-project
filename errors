@@ -1,13 +1,113 @@
-app = FastAPI()
+ ERROR:    Exception in ASGI application
+backend-1    | Traceback (most recent call last):
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+backend-1    |     yield
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_transports/default.py", line 394, in handle_async_request
+backend-1    |     resp = await self._pool.handle_async_request(req)
+backend-1    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpcore/_async/connection_pool.py", line 256, in handle_async_request
+backend-1    |     raise exc from None
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpcore/_async/connection_pool.py", line 236, in handle_async_request
+backend-1    |     response = await connection.handle_async_request(
+backend-1    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpcore/_async/connection.py", line 103, in handle_async_request
+backend-1    |     return await self._connection.handle_async_request(request)
+backend-1    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpcore/_async/http11.py", line 136, in handle_async_request
+backend-1    |     raise exc
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpcore/_async/http11.py", line 106, in handle_async_request
+backend-1    |     ) = await self._receive_response_headers(**kwargs)
+backend-1    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpcore/_async/http11.py", line 177, in _receive_response_headers
+backend-1    |     event = await self._receive_event(timeout=timeout)
+backend-1    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpcore/_async/http11.py", line 217, in _receive_event
+backend-1    |     data = await self._network_stream.read(
+backend-1    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpcore/_backends/anyio.py", line 32, in read
+backend-1    |     with map_exceptions(exc_map):
+backend-1    |   File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+backend-1    |     self.gen.throw(typ, value, traceback)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+backend-1    |     raise to_exc(exc) from exc
+backend-1    | httpcore.ReadTimeout
+backend-1    |
+backend-1    | The above exception was the direct cause of the following exception:
+backend-1    |
+backend-1    | Traceback (most recent call last):
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 409, in run_asgi
+backend-1    |     result = await app(  # type: ignore[func-returns-value]
+backend-1    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+backend-1    |     return await self.app(scope, receive, send)
+backend-1    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/fastapi/applications.py", line 1054, in __call__
+backend-1    |     await super().__call__(scope, receive, send)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/applications.py", line 113, in __call__
+backend-1    |     await self.middleware_stack(scope, receive, send)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/middleware/errors.py", line 186, in __call__
+backend-1    |     raise exc
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/middleware/errors.py", line 164, in __call__
+backend-1    |     await self.app(scope, receive, _send)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/middleware/cors.py", line 93, in __call__
+backend-1    |     await self.simple_response(scope, receive, send, request_headers=headers)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/middleware/cors.py", line 144, in simple_response
+backend-1    |     await self.app(scope, receive, send)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+backend-1    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+backend-1    |     raise exc
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+backend-1    |     await app(scope, receive, sender)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 716, in __call__
+backend-1    |     await self.middleware_stack(scope, receive, send)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 736, in app
+backend-1    |     await route.handle(scope, receive, send)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 290, in handle
+backend-1    |     await self.app(scope, receive, send)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 78, in app
+backend-1    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+backend-1    |     raise exc
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+backend-1    |     await app(scope, receive, sender)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 75, in app
+backend-1    |     response = await f(request)
+backend-1    |                ^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 302, in app
+backend-1    |     raw_response = await run_endpoint_function(
+backend-1    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 213, in run_endpoint_function
+backend-1    |     return await dependant.call(**values)
+backend-1    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/app/main.py", line 30, in query_data
+backend-1    |     res = await client.post("http://ollama:11434/api/generate", json={
+backend-1    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_client.py", line 1859, in post
+backend-1    |     return await self.request(
+backend-1    |            ^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_client.py", line 1540, in request
+backend-1    |     return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+backend-1    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_client.py", line 1629, in send
+backend-1    |     response = await self._send_handling_auth(
+backend-1    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_client.py", line 1657, in _send_handling_auth
+backend-1    |     response = await self._send_handling_redirects(
+backend-1    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_client.py", line 1694, in _send_handling_redirects
+backend-1    |     response = await self._send_single_request(request)
+backend-1    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_client.py", line 1730, in _send_single_request
+backend-1    |     response = await transport.handle_async_request(request)
+backend-1    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_transports/default.py", line 393, in handle_async_request
+backend-1    |     with map_httpcore_exceptions():
+backend-1    |   File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+backend-1    |     self.gen.throw(typ, value, traceback)
+backend-1    |   File "/usr/local/lib/python3.11/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+backend-1    |     raise mapped_exc(message) from exc
+backend-1    | httpx.ReadTimeout
 
-# On déclare d'abord les routes API comme /query
-class Query(BaseModel):
-    prompt: str
 
-@app.post("/query")
-async def query_data(data: Query):
-    ...
-
-# Ensuite, on monte les fichiers statiques APRÈS
-from fastapi.staticfiles import StaticFiles
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+w Enable Watch
