@@ -1,2 +1,3 @@
-curl -X POST http://localhost:8000/query -H "Content-Type: application/json" -d '{"prompt": "Quels sont les avantages de l’open data ?"}'
-{"error":"model 'phi3' not found"}s
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Liste des produits avec quantité > 200"}'
