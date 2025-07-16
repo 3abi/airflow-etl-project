@@ -1,2 +1,13 @@
-curl -X POST http://localhost:8000/query   -H "Content-Type: application/json"   -d '{"prompt": "Liste des produits avec quantité > 200"}'
-{"detail":"Method Not Allowed"}
+app = FastAPI()
+
+# On déclare d'abord les routes API comme /query
+class Query(BaseModel):
+    prompt: str
+
+@app.post("/query")
+async def query_data(data: Query):
+    ...
+
+# Ensuite, on monte les fichiers statiques APRÈS
+from fastapi.staticfiles import StaticFiles
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
