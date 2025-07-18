@@ -1,17 +1,60 @@
-SQL généré :
-Pour convertir la requête "Liste des produits" en une instruction SQL, on peut utiliser la commande SELECT pour obtenir toutes les colonnes de la table nommée 'produits'. Si l'on veut afficher seulement certains champs spécifiques (par exemple, le nom du produit et son prix), on inclurait ces champs dans la clause SELECT. Voici comment cela serait écrit :
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 
-```sql
-SELECT * FROM produits;
--- Ou si vous souhaitez sélectionner uniquement les colonnes 'nom_produit' et 'prix':
-SELECT nom_produit, prix FROM produits;
-```
+from pydantic import BaseModel
+import httpx
+import psycopg2
+import os
 
-Dans ces exemples, "produits" serait le nom de la table où sont stockés les informations des produits. Si vous souhaitez filtrer ou trier les résultats, par exemple pour obtenir uniquement les produits disponibles en magasin ou triés par prix décroissant, vous utiliseriez alors une clause WHERE ou ORDER BY respectivement. Par exemple:
+app = FastAPI()
 
-```sql
-SELECT * FROM produits WHERE disponibilite_en_magasin = 'Oui' ORDER BY prix DESC;
--- Cela retournerait tous les produits disponibles en magasin triés par prix décroissant.
-```
-Résultat :
-"syntax error at or near \"Pour\"\nLINE 1: Pour convertir la requête \"Liste des produits\" en une instru...\n        ^\n"
+# CORS
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+
+# Data model
+class Query(BaseModel):
+    prompt: str
+
+@app.post("/query")
+async def query_data(data: Query):
+    # Appel au modèle phi3 via le conteneur ollama
+    async with httpx.AsyncClient() as client:
+        res = await client.post("http://ollama:11434/api/generate", json={
+            "model": "phi3:mini",
+            "prompt": f"Convertis cette demande en SQL: {data.prompt}",
+            "stream": False
+        },
+        timeout=60
+        )
+        result = res.json()
+        generated = result.get("response", "").strip()
+
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv("POSTGRES_HOST", "postgres"),
+            port=os.getenv("POSTGRES_PORT", 5432),
+            database=os.getenv("POSTGRES_DB", "demo"),
+            user=os.getenv("POSTGRES_USER", "demo"),
+            password=os.getenv("POSTGRES_PASSWORD", "demo")
+        )
+        cur = conn.cursor()
+        cur.execute(generated)
+        rows = cur.fetchall()
+        columns = [desc[0] for desc in cur.description]
+        cur.close()
+        conn.close()
+        return {"query": generated, "result": [dict(zip(columns, row)) for row in rows]}
+    except Exception as e:
+        return {"query": generated, "error": str(e)}
+
+from fastapi.staticfiles import StaticFiles
+# Serve static frontend
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
