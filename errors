@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from pydantic import BaseModel
 import httpx
 import psycopg2
 import os
+import re
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
@@ -17,8 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
 # Data model
 class Query(BaseModel):
     prompt: str
@@ -27,16 +26,26 @@ class Query(BaseModel):
 async def query_data(data: Query):
     # Appel au modèle phi3 via le conteneur ollama
     async with httpx.AsyncClient() as client:
-        res = await client.post("http://ollama:11434/api/generate", json={
-            "model": "phi3:mini",
-            "prompt": f"Convertis cette demande en SQL: {data.prompt}",
-            "stream": False
-        },
-        timeout=60
+        res = await client.post(
+            "http://ollama:11434/api/generate",
+            json={
+                "model": "phi3:mini",
+                "prompt": f"Convertis cette demande en SQL: {data.prompt}",
+                "stream": False
+            },
+            timeout=60
         )
         result = res.json()
-        generated = result.get("response", "").strip()
+        full_response = result.get("response", "").strip()
 
+    # Extraire la requête SQL entre balises ```sql ... ```
+    sql_matches = re.findall(r"```sql\s*(.*?)\s*```", full_response, re.DOTALL | re.IGNORECASE)
+    if not sql_matches:
+        return {"response": full_response, "error": "Aucune requête SQL valide trouvée dans la réponse."}
+
+    sql_query = sql_matches[0].strip()
+
+    # Connexion à PostgreSQL
     try:
         conn = psycopg2.connect(
             host=os.getenv("POSTGRES_HOST", "postgres"),
@@ -46,15 +55,23 @@ async def query_data(data: Query):
             password=os.getenv("POSTGRES_PASSWORD", "demo")
         )
         cur = conn.cursor()
-        cur.execute(generated)
+        cur.execute(sql_query)
         rows = cur.fetchall()
         columns = [desc[0] for desc in cur.description]
         cur.close()
         conn.close()
-        return {"query": generated, "result": [dict(zip(columns, row)) for row in rows]}
-    except Exception as e:
-        return {"query": generated, "error": str(e)}
 
-from fastapi.staticfiles import StaticFiles
+        return {
+            "query": sql_query,
+            "result": [dict(zip(columns, row)) for row in rows],
+            "response": full_response
+        }
+    except Exception as e:
+        return {
+            "query": sql_query,
+            "error": str(e),
+            "response": full_response
+        }
+
 # Serve static frontend
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
